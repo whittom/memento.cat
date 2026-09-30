@@ -19,7 +19,8 @@ export function blobUrl(pds: string, did: string, cid: string): string {
 
 /**
  * Convertit un élément de app.bsky.feed.getAuthorFeed en publication normalisée.
- * Renvoie null pour les republications (repost) et les publications d'un autre auteur.
+ * Renvoie null pour les republications (repost), les publications d'un autre auteur et les
+ * citations d'un autre compte.
  * videoUrl(cid) construit l'URL de téléchargement d'une vidéo (blob sur le PDS de l'auteur).
  */
 export function mapFeedItem(
@@ -33,6 +34,7 @@ export function mapFeedItem(
   if (!post) return null;
   const author = obj(post["author"]);
   if (str(author?.["did"]) !== creatorDid) return null;
+  if (isExternalQuote(post["embed"], creatorDid)) return null;
 
   const uri = str(post["uri"]);
   const parsed = uri ? parseAtUri(uri) : undefined;
@@ -56,6 +58,19 @@ export function mapFeedItem(
     sourceUrl: `https://bsky.app/profile/${creatorDid}/post/${parsed.rkey}`,
     media: mapEmbed(post["embed"], videoUrl),
   };
+}
+
+/**
+ * Vrai pour une citation pure (embed record) d'un autre compte : le texte n'est qu'un commentaire
+ * sur le contenu d'autrui. Une citation avec médias propres (recordWithMedia) n'est pas visée.
+ * Sans auteur identifiable (publication introuvable ou détachée), on la traite comme externe.
+ */
+function isExternalQuote(embed: Json | undefined, creatorDid: string): boolean {
+  const e = obj(embed);
+  if (!e || str(e["$type"]) !== "app.bsky.embed.record#view") return false;
+  const quoted = obj(e["record"]);
+  const did = str(obj(quoted?.["author"])?.["did"]) ?? str(obj(quoted?.["creator"])?.["did"]);
+  return did !== creatorDid;
 }
 
 /** Date de création, bornée par la date d'indexation (une date future est ramenée à l'indexation). */

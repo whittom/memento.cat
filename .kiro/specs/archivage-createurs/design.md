@@ -55,7 +55,7 @@ export interface Connector {
 | Élément | Bluesky | Reddit |
 | --- | --- | --- |
 | Créateur | DID via `app.bsky.actor.getProfile` | nom d'utilisateur (`/user/<nom>/about`) |
-| Publications | `app.bsky.feed.getAuthorFeed`, sans réponses | `/user/<nom>/submitted` |
+| Publications | `app.bsky.feed.getAuthorFeed`, sans réponses ; écartés : republications (`reason`), publications d'un autre auteur, citations d'un autre compte (`embed` de type `app.bsky.embed.record#view` dont l'auteur n'est pas le créateur). Une citation avec médias propres (`recordWithMedia`) est conservée | `/user/<nom>/submitted` |
 | Titre | aucun | `title` |
 | Texte | `record.text` | `selftext` |
 | Médias | images et vidéo intégrées | image `i.redd.it`, galerie (`media_metadata`), vidéo `v.redd.it` |
