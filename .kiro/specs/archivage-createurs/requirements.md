@@ -28,6 +28,12 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 7. SI une exécution planifiée n'a pas eu lieu (panne, ordinateur éteint en exécution locale), ALORS LA PROCHAINE exécution DOIT rattraper les publications manquées à partir du curseur.
 8. LE SYSTÈME DOIT borner chaque exécution par un budget de sous-requêtes et de requêtes D1, s'arrêter proprement avant la limite et reprendre au passage suivant sans perte ni doublon.
 
+### Synchronisation manuelle
+9. QUAND l'utilisateur demande la synchronisation d'un créateur actif, LE SYSTÈME DOIT collecter immédiatement ce seul créateur, selon les règles de la collecte planifiée (curseur, budget, quotas, aucun doublon), et afficher la progression jusqu'à la fin.
+10. SI le créateur est désactivé, supprimé ou en cours d'effacement, ALORS LE SYSTÈME DOIT refuser la synchronisation manuelle avec un message explicite.
+11. SI la synchronisation manuelle échoue ou est interrompue par le budget, ALORS LE SYSTÈME DOIT conserver le curseur, afficher la cause, et permettre de la relancer pour reprendre sans perte ni doublon.
+12. LA synchronisation manuelle NE DOIT PAS rapatrier l'historique antérieur au curseur (voir Limites connues du README).
+
 ## Exigence 3 — Stockage
 1. LE SYSTÈME DOIT ranger chaque publication sous `<plateforme>/<créateur>/<AAAA>/<MM>/<AAAA-MM-JJ>_<id>/`, avec ses médias et un `post.json`.
 2. LE SYSTÈME DOIT conserver les médias sans recompression et enregistrer une empreinte de contenu par média (l'empreinte MD5 calculée par R2 ; un SHA-256 calculé dans le Worker dépasserait la limite de temps processeur du plan gratuit).

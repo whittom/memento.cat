@@ -124,6 +124,13 @@ Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `dele
 - Suppression physique par lots, comme la vérification : chaque appel efface jusqu'à N publications (objets R2 sous le préfixe du créateur, puis lignes `media`, `posts`, index plein texte) et renvoie `{ restantes }`. La galerie relance jusqu'à 0, puis la ligne `creators` est effacée. L'état `purging` permet la reprise après interruption.
 - Avant confirmation, `GET /api/creators/:id/stats` fournit le nombre de publications, de médias et le volume à effacer.
 
+## Synchronisation manuelle
+- `POST /api/creators/:id/sync` collecte un seul créateur actif, avec un budget neuf (mêmes limites que `scheduled()`), et renvoie `{ archived, done }`. `done` est vrai lorsque le curseur est rejoint sans épuisement du budget.
+- Le code de collecte d'un créateur est partagé avec la collecte planifiée (`collectCreator` dans `src/collect/`) : mêmes règles de curseur, de doublons et de quotas.
+- La galerie rappelle l'endpoint tant que `done` est faux et que `archived > 0` (au plus 25 appels), puis affiche le bilan. Aucun traitement long côté serveur.
+- Réponses : 404 (créateur inconnu ou en effacement), 409 (créateur désactivé ou dans la corbeille), 429 (quota de la plateforme), 502 (erreur de la plateforme). Un échec est enregistré comme pour la collecte planifiée (`last_error`), le curseur est conservé.
+- Une synchronisation manuelle simultanée à un passage planifié est sans danger : l'insertion des publications est idempotente.
+
 ## Vérification des suppressions
 - `POST /api/creators/:id/verify` traite un lot (par défaut 50 publications, les moins récemment vérifiées) et renvoie `{ traitées, restantes, supprimées }`.
 - La galerie rappelle l'endpoint jusqu'à `restantes = 0` et affiche la progression : aucun traitement long côté serveur, aucun déclenchement planifié.
@@ -140,6 +147,7 @@ Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `dele
 | POST | `/api/creators/:id/restore` | restauration d'un créateur supprimé logiquement |
 | POST | `/api/creators/:id/purge` | suppression physique par lot (corps : `{ "confirm": "<handle>" }`) |
 | POST | `/api/creators/:id/verify` | vérification par lot |
+| POST | `/api/creators/:id/sync` | synchronisation manuelle d'un créateur actif (réponse : `{ archived, done }`) |
 | GET | `/api/posts?creator&platform&from&to&q&status&unviewed&cursor` | liste paginée, avec pour chaque publication ses miniatures, le nombre de médias et le nombre non consultés |
 | GET | `/api/posts/:id` | détail |
 | GET | `/api/media/<clé R2>` | diffusion d'un média ou d'une miniature (en-têtes de cache longs, contenu immuable) |
@@ -147,7 +155,7 @@ Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `dele
 | POST | `/api/admin/reindex` | reconstruction de l'index D1 depuis les `post.json`, par lots (corps : `{ "cursor" }`) |
 
 ## Galerie
-SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtrable, fiche publication, gestion des créateurs (ajout, désactiver/réactiver, supprimer avec choix logique ou physique, corbeille avec restauration), fiche créateur (avec bouton « Vérifier les suppressions »). La suppression physique demande de retaper le nom du créateur. Mise en page conçue d'abord pour le mobile ; grille de 1 à 4 colonnes selon la largeur.
+SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtrable, fiche publication, gestion des créateurs (ajout, bouton « Synchroniser maintenant », désactiver/réactiver, supprimer avec choix logique ou physique, corbeille avec restauration), fiche créateur (avec bouton « Vérifier les suppressions »). La suppression physique demande de retaper le nom du créateur. Mise en page conçue d'abord pour le mobile ; grille de 1 à 4 colonnes selon la largeur.
 
 ## Configuration et secrets
 | Élément | Où | Versionné ? |
