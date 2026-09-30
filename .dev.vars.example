@@ -1,0 +1,4 @@
+# Copier vers .dev.vars (ignoré par Git) pour le développement local.
+REQUIRE_ACCESS=false
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=

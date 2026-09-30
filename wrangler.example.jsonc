@@ -1,0 +1,52 @@
+// Modèle de configuration. Copier vers wrangler.jsonc (ignoré par Git),
+// puis remplacer <ID_D1> par l'identifiant renvoyé par `wrangler d1 create memento-db`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "memento",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-28",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // La galerie n'est servie que derrière Cloudflare Access (domaine personnalisé).
+  // Désactiver l'URL *.workers.dev évite un accès qui contournerait Access.
+  "workers_dev": false,
+  // "routes": [{ "pattern": "memento.example.com", "custom_domain": true }],
+
+  "assets": {
+    "directory": "./web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Le Worker vérifie le jeton Access avant de servir la galerie.
+    "run_worker_first": true
+  },
+
+  // Petits lots fréquents, pour rester sous les limites par invocation du plan gratuit.
+  "triggers": { "crons": ["*/15 * * * *"] },
+
+  "d1_databases": [
+    { "binding": "DB", "database_name": "memento-db", "database_id": "<ID_D1>", "migrations_dir": "migrations" }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "memento-media" }],
+
+  "vars": {
+    // Contrôle d'accès : "true" en production. ACCESS_TEAM_DOMAIN = "<équipe>.cloudflareaccess.com".
+    "REQUIRE_ACCESS": "true",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    // Budget par exécution planifiée, calé sur les limites du plan gratuit (à ajuster si besoin).
+    // Plan gratuit : 50 sous-requêtes externes et 50 requêtes D1 par invocation.
+    // Sur Workers Paid, ces valeurs peuvent être fortement augmentées.
+    "MAX_SUBREQUESTS_PER_RUN": "45",
+    "MAX_QUERIES_PER_RUN": "40",
+    "MAX_PAGES_PER_CREATOR": "3",
+    "MAX_MEDIA_BYTES": "104857600",
+    "RATE_LIMIT_FLOOR": "10",
+    // Pour Reddit : "<plateforme>:<id app>:<version> (by /u/<utilisateur>)"
+    "REDDIT_USER_AGENT": ""
+  },
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  }
+}

@@ -1,0 +1,181 @@
+# Conception — Archivage de créateurs
+
+## Vue d'ensemble
+Un seul Cloudflare Worker porte tout le système : `scheduled()` collecte, `fetch()` sert l'API `/api/*`, et Workers Static Assets sert la galerie. D1 indexe, R2 stocke. Le même code tourne localement avec `wrangler dev`.
+
+```mermaid
+flowchart LR
+  cron[Cron Trigger] --> collect[collect/]
+  collect --> bsky[connectors/bluesky]
+  collect --> rdt[connectors/reddit]
+  bsky --> norm[NormalizedPost]
+  rdt --> norm
+  norm --> store[storage/]
+  store --> R2[(R2 : médias + post.json)]
+  store --> D1[(D1 : index + FTS)]
+  spa[Galerie SPA] --> api[api/]
+  api --> D1
+  api --> R2
+  api --> verify[verify/]
+  verify --> bsky
+  verify --> rdt
+  access[Cloudflare Access] -.protège.-> spa
+  access -.protège.-> api
+```
+
+## Interfaces des connecteurs
+```ts
+export interface NormalizedMedia {
+  sourceUrl: string;
+  mimeType: string;
+  description: string | null; // alt Bluesky, légende de galerie Reddit
+}
+
+export interface NormalizedPost {
+  id: string;                 // "<plateforme>:<id natif>"
+  platform: "bluesky" | "reddit";
+  creatorId: string;
+  publishedAt: string;        // ISO 8601 UTC
+  title: string | null;
+  text: string;
+  sourceUrl: string;
+  media: NormalizedMedia[];
+}
+
+export type PostState = "active" | "deleted" | "unknown";
+
+export interface Connector {
+  resolveCreator(handle: string): Promise<{ creatorId: string; displayName: string }>;
+  fetchSince(creatorId: string, cursor: string | null): Promise<{ posts: NormalizedPost[]; cursor: string | null }>;
+  checkStates(postIds: string[]): Promise<Map<string, PostState>>;
+}
+```
+
+## Correspondance par plateforme
+| Élément | Bluesky | Reddit |
+| --- | --- | --- |
+| Créateur | DID via `app.bsky.actor.getProfile` | nom d'utilisateur (`/user/<nom>/about`) |
+| Publications | `app.bsky.feed.getAuthorFeed`, sans réponses | `/user/<nom>/submitted` |
+| Titre | aucun | `title` |
+| Texte | `record.text` | `selftext` |
+| Médias | images et vidéo intégrées | image `i.redd.it`, galerie (`media_metadata`), vidéo `v.redd.it` |
+| Description du média | `alt` de chaque image | légende de l'élément de galerie |
+| Suppression | URI absente de `app.bsky.feed.getPosts` | `/api/info?id=t3_…` : auteur `[deleted]` ou contenu retiré |
+| Conséquence | statut « supprimé », copie conservée | statut « supprimé », copie conservée (pas de purge en v1) |
+
+## Modèle de données (D1)
+Le schéma de référence est `migrations/0001_init.sql` (tables `creators`, `posts`, `media`, table virtuelle FTS5 `posts_fts`). FTS5 est validé en local avec D1.
+
+Points notables :
+- `creators.state` : `active`, `paused`, `deleted`, `purging` ; `creators.cursor` : date ISO de la dernière publication archivée.
+- `posts.native_ref` : URI `at://` (Bluesky) ou fullname `t3_` (Reddit), utilisée pour la vérification des suppressions.
+- `media.etag` : empreinte MD5 calculée par R2 ; `media.viewed_at` : première consultation ; `media.downloaded = 0` si le média dépasse la taille maximale ou était indisponible.
+
+## Miniatures
+Les Workers du plan gratuit ne conviennent pas au redimensionnement d'images (temps processeur limité). Les miniatures sont donc celles que fournissent les plateformes, archivées au moment de la collecte :
+
+| Plateforme | Miniature | Version complète |
+| --- | --- | --- |
+| Bluesky, image | `thumb` de la vue de l'image | `fullsize` |
+| Bluesky, vidéo | `thumbnail` de la vue vidéo | fichier d'origine sur le serveur (PDS) de l'auteur, via `com.atproto.sync.getBlob` |
+| Reddit, image ou galerie | plus petite résolution de `preview` ou de `media_metadata` (≈ 320 px) | `i.redd.it` d'origine |
+| Reddit, vidéo | image d'aperçu | `fallback_url` de `v.redd.it` (sans audio) |
+
+Clés R2 : `.../media_01.jpg` et `.../media_01.thumb.jpg`. Sans miniature, la galerie affiche le média complet réduit en CSS (`object-fit: cover`), chargé paresseusement. Option à évaluer plus tard : un service de transformation d'images (vérifier son coût avant de l'activer).
+
+## Stockage (R2)
+- Clé : `<plateforme>/<créateur>/<AAAA>/<MM>/<AAAA-MM-JJ>_<id natif>/media_01.jpg`, `.../post.json`.
+- `post.json` reprend `NormalizedPost` plus `capturedAt`, `status` et les empreintes des médias : c'est la source de vérité, D1 se reconstruit à partir d'elle.
+- Les médias sont diffusés de la plateforme vers R2 sans chargement complet en mémoire.
+
+## Limites du plan gratuit
+Par invocation : 50 sous-requêtes externes, 50 requêtes D1, 10 ms de temps processeur (l'attente réseau n'est pas comptée). En conséquence :
+- déclencheur toutes les 15 minutes, petits lots ;
+- `Budget` compte les appels sortants et `countingDb` compte les requêtes D1 (une par instruction d'un batch) ; avant chaque publication, le Worker vérifie qu'il reste de quoi l'archiver entièrement ;
+- les médias passent de la plateforme à R2 en flux, sans passer par le code JavaScript ;
+- lots réduits pour les actions de la galerie : vérification 25 publications, effacement 10, réindexation 12 objets par appel.
+Sur Workers Paid, relever `MAX_SUBREQUESTS_PER_RUN` et `MAX_QUERIES_PER_RUN`.
+
+## Flux de collecte
+1. `scheduled()` charge les créateurs actifs.
+2. Pour chaque créateur : `fetchSince(cursor)`, pagination jusqu'au curseur connu.
+3. Pour chaque publication nouvelle : écriture des médias puis de `post.json` dans R2, puis insertion D1 (idempotente sur `id`).
+4. Le curseur avance après chaque publication archivée : un arrêt en cours de route (budget, quota) ne perd rien et ne crée pas de doublon.
+5. Un limiteur par plateforme lit les en-têtes de quota et suspend les appels au besoin.
+
+## Consultation des médias
+- État par média : `viewed_at` (un seul utilisateur, donc pas de table par utilisateur).
+- État dérivé par publication : `aucun`, `partiel` ou `complet`, calculé à la requête (`COUNT` des médias non consultés).
+- Marquage automatique à l'ouverture dans la visionneuse (`POST /api/views`, portée `media`), envoyé sans bloquer l'affichage ; en cas d'échec réseau, l'état local est conservé et renvoyé au prochain chargement.
+- Marquage manuel en masse : `POST /api/views` avec `{ "scope": "media" | "post" | "creator", "id": "...", "viewed": true | false }`.
+
+## Cycle de vie d'un créateur
+| État | Synchronisation | Visible dans la galerie | Données |
+| --- | --- | --- | --- |
+| `active` | oui | oui | conservées |
+| `paused` (désactivé) | non | oui | conservées |
+| `deleted` (suppression logique) | non | non (sauf vue « Corbeille ») | conservées |
+| `purging` (suppression physique en cours) | non | non | en cours d'effacement |
+
+Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `deleted` → `paused` (restauration) ; tout état → `purging` → ligne effacée.
+
+- La collecte ne traite que `state = 'active'`.
+- Les requêtes de la galerie et la recherche excluent `deleted` et `purging` par jointure sur `creators`.
+- Suppression physique par lots, comme la vérification : chaque appel efface jusqu'à N publications (objets R2 sous le préfixe du créateur, puis lignes `media`, `posts`, index plein texte) et renvoie `{ restantes }`. La galerie relance jusqu'à 0, puis la ligne `creators` est effacée. L'état `purging` permet la reprise après interruption.
+- Avant confirmation, `GET /api/creators/:id/stats` fournit le nombre de publications, de médias et le volume à effacer.
+
+## Vérification des suppressions
+- `POST /api/creators/:id/verify` traite un lot (par défaut 50 publications, les moins récemment vérifiées) et renvoie `{ traitées, restantes, supprimées }`.
+- La galerie rappelle l'endpoint jusqu'à `restantes = 0` et affiche la progression : aucun traitement long côté serveur, aucun déclenchement planifié.
+- Bluesky et Reddit : statut `deleted`, copie conservée. Purge reportée (voir exigences).
+
+## API
+| Méthode | Route | Rôle |
+| --- | --- | --- |
+| GET | `/api/creators` | liste des créateurs et état de collecte |
+| POST | `/api/creators` | ajout (`platform`, `handle`) |
+| PATCH | `/api/creators/:id` | activer ou désactiver (`active` ⇄ `paused`) |
+| GET | `/api/creators/:id/stats` | publications, médias et volume (avant suppression) |
+| DELETE | `/api/creators/:id?mode=logical` | suppression logique |
+| POST | `/api/creators/:id/restore` | restauration d'un créateur supprimé logiquement |
+| POST | `/api/creators/:id/purge` | suppression physique par lot (corps : `{ "confirm": "<handle>" }`) |
+| POST | `/api/creators/:id/verify` | vérification par lot |
+| GET | `/api/posts?creator&platform&from&to&q&status&unviewed&cursor` | liste paginée, avec pour chaque publication ses miniatures, le nombre de médias et le nombre non consultés |
+| GET | `/api/posts/:id` | détail |
+| GET | `/api/media/<clé R2>` | diffusion d'un média ou d'une miniature (en-têtes de cache longs, contenu immuable) |
+| POST | `/api/views` | marquage consulté / non consulté (média, publication, créateur) |
+| POST | `/api/admin/reindex` | reconstruction de l'index D1 depuis les `post.json`, par lots (corps : `{ "cursor" }`) |
+
+## Galerie
+SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtrable, fiche publication, gestion des créateurs (ajout, désactiver/réactiver, supprimer avec choix logique ou physique, corbeille avec restauration), fiche créateur (avec bouton « Vérifier les suppressions »). La suppression physique demande de retaper le nom du créateur. Mise en page conçue d'abord pour le mobile ; grille de 1 à 4 colonnes selon la largeur.
+
+## Configuration et secrets
+| Élément | Où | Versionné ? |
+| --- | --- | --- |
+| Créateurs suivis | table `creators` (D1), gérée depuis la galerie | non |
+| Réglages non secrets (fréquence, seuils, tailles max) | `vars` dans `wrangler.jsonc` | oui (valeurs par défaut) |
+| Identifiants des ressources (D1, R2, domaine) | `wrangler.jsonc`, généré depuis `wrangler.example.jsonc` | non (`.gitignore`) |
+| Secrets Reddit (client, secret) | `wrangler secret put` ; en local `.dev.vars` | non (`.gitignore`) |
+| Jeton de déploiement Cloudflare | secrets du dépôt GitHub (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) | non |
+
+## Présentation dans la galerie
+- **Tuile simple** : la miniature, avec une pastille « nouveau » tant que le média n'est pas consulté ; une fois consulté, la pastille disparaît et la tuile est légèrement atténuée.
+- **Tuile de groupe** : la miniature du premier élément, un effet de pile (deux bords décalés derrière la tuile), une pastille avec l'icône de pile et le nombre d'éléments, et l'état « 3 non vus » ou « partiel » tant que tout le groupe n'a pas été consulté.
+- **Visionneuse** : superposition plein écran ; version complète chargée à l'ouverture, élément suivant préchargé. Pour un groupe : position « 2/5 » et bande de miniatures cliquable ; suivant/précédent parcourt le groupe, puis passe à la publication voisine. Titre, texte, description du média et lien source dans un panneau repliable.
+- L'état de la visionneuse est dans l'URL (`/publication/:id?media=2`), pour que le bouton Retour la ferme.
+
+## Sécurité
+- Cloudflare Access devant l'ensemble du domaine (galerie et API). Le Worker vérifie aussi le jeton Access (signature RS256, audience, émetteur, expiration) sur chaque requête, y compris pour la galerie (`run_worker_first`), et `workers_dev` est désactivé. En local, `REQUIRE_ACCESS=false`.
+- Les requêtes qui modifient des données exigent `Content-Type: application/json`, ce qui bloque les envois de formulaires depuis un autre site.
+- Identifiants Reddit en secrets Wrangler.
+- Aucune route publique.
+
+## Erreurs et observabilité
+- Classes d'erreur typées par cause (quota, introuvable, plateforme).
+- Journaux JSON structurés par créateur et par exécution ; observabilité Workers activée.
+
+## Tests
+- Connecteurs : réponses d'API enregistrées (fixtures) rejouées, y compris cas de suppression.
+- Stockage et API : Vitest dans le runtime Workers avec D1 et R2 réels (`@cloudflare/vitest-plugin`).
+- Galerie : contrôle visuel aux largeurs 390 et 1280 px.
+- Contrôle Access : jetons RS256 générés dans les tests (valide, falsifié, expiré, autre audience, autre émetteur, clé inconnue).
