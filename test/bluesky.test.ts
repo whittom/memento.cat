@@ -41,6 +41,24 @@ describe("Bluesky : correspondance des publications", () => {
     expect(mapFeedItem(item({}, { author: { did: "did:plc:autre" } }), did, video)).toBeNull();
   });
 
+  it("ignore les citations d'un autre compte, garde celles de soi-même et celles avec médias propres", () => {
+    const quote = (author: string | undefined, type = "app.bsky.embed.record#view") => ({
+      embed: { $type: type, record: { $type: "app.bsky.embed.record#viewRecord", ...(author ? { author: { did: author } } : {}) } },
+    });
+    expect(mapFeedItem(item({}, quote("did:plc:autre")), did, video)).toBeNull();
+    expect(mapFeedItem(item({}, quote(undefined)), did, video)).toBeNull();
+    expect(mapFeedItem(item({}, { embed: { $type: "app.bsky.embed.record#view", record: { creator: { did: "did:plc:autre" } } } }), did, video)).toBeNull();
+    expect(mapFeedItem(item({}, quote(did)), did, video)).not.toBeNull();
+    const withOwnMedia = {
+      embed: {
+        $type: "app.bsky.embed.recordWithMedia#view",
+        record: { record: { author: { did: "did:plc:autre" } } },
+        media: { $type: "app.bsky.embed.images#view", images: [{ thumb: "https://cdn/t", fullsize: "https://cdn/f" }] },
+      },
+    };
+    expect(mapFeedItem(item({}, withOwnMedia), did, video)?.media).toHaveLength(1);
+  });
+
   it("garde le texte alternatif comme description et la miniature fournie", () => {
     const p = mapFeedItem(
       item({}, {
