@@ -2,7 +2,10 @@ import { api, ApiError } from "../api";
 import { addChildren, fmtBytes, fmtDateTime, h, platformLabel, plural, setChildren, toast } from "../dom";
 import type { Creator } from "../types";
 
-const errorText = (e: unknown): string => (e instanceof ApiError ? e.message : "Action impossible. Vérifiez la connexion, puis réessayez.");
+/** Nombre maximal d'appels enchaînés pour une synchronisation manuelle (chaque appel a son propre budget). */
+const MAX_SYNC_CALLS = 25;
+
+const errorText =(e: unknown): string => (e instanceof ApiError ? e.message : "Action impossible. Vérifiez la connexion, puis réessayez.");
 
 /** Page de gestion des créateurs suivis. */
 export async function renderCreators(root: HTMLElement): Promise<void> {
@@ -123,6 +126,28 @@ function creatorRow(c: Creator, refresh: () => void): HTMLElement {
     }
   });
 
+  const syncBtn = h("button", { type: "button", class: "btn" }, "Synchroniser maintenant");
+  syncBtn.addEventListener("click", async () => {
+    syncBtn.disabled = true;
+    let archived = 0;
+    try {
+      for (let call = 0; call < MAX_SYNC_CALLS; call++) {
+        progress.textContent = archived > 0 ? `Synchronisation : ${plural(archived, "publication archivée", "publications archivées")}…` : "Synchronisation en cours…";
+        const r = await api.sync(c.id);
+        archived += r.archived;
+        // Sans progrès, relancer ne servirait à rien : on s'arrête et on l'indique.
+        if (r.done) break;
+        if (r.archived === 0) throw new Error("Aucune progression");
+      }
+      toast(archived > 0 ? `${c.handle} : ${plural(archived, "nouvelle publication archivée", "nouvelles publications archivées")}` : `${c.handle} : rien de nouveau`);
+      refresh();
+    } catch (e) {
+      const cause = e instanceof ApiError ? e.message : "Synchronisation interrompue avant la fin.";
+      progress.textContent = `${cause}${archived > 0 ? ` ${plural(archived, "publication archivée", "publications archivées")} avant l'arrêt.` : ""} Relancez pour reprendre.`;
+      syncBtn.disabled = false;
+    }
+  });
+
   return h(
     "li",
     { class: "creator-row" },
@@ -137,6 +162,7 @@ function creatorRow(c: Creator, refresh: () => void): HTMLElement {
     h(
       "div",
       { class: "creator-buttons" },
+      c.state === "active" ? syncBtn : null,
       h(
         "button",
         {

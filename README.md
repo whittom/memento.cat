@@ -62,6 +62,15 @@ npm test
 
 Ajoutez ensuite vos créateurs depuis la page « Créateurs » de la galerie : la liste vit dans D1, jamais dans le dépôt.
 
+## Synchronisation manuelle
+
+En plus de la collecte planifiée (toutes les 15 minutes), le bouton **Synchroniser maintenant** de la page « Créateurs » collecte un seul créateur actif sans attendre le prochain passage. Il suit les mêmes règles que la collecte planifiée (curseur, budget de sous-requêtes, quotas, aucun doublon) et enchaîne les appels avec la progression affichée, jusqu'à ce que le curseur soit rejoint.
+
+- Le bouton n'apparaît que pour un créateur actif : réactivez d'abord un créateur désactivé, ou restaurez-le depuis la corbeille.
+- Comme la collecte planifiée, il ne rapatrie pas l'historique antérieur au curseur (voir « Limites connues »). Au premier passage d'un nouveau créateur, seule la page la plus récente est archivée.
+- En cas d'erreur ou d'interruption (quota, budget), le curseur est conservé : relancez pour reprendre.
+- API : `POST /api/creators/:id/sync` renvoie `{ "archived": <n>, "done": <booléen> }`.
+
 ### Déploiement automatique depuis GitHub (optionnel)
 
 Les jetons vont dans les secrets du dépôt GitHub (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), jamais dans le code. `wrangler.jsonc` n'étant pas versionné, l'intégration doit le générer à partir de `wrangler.example.jsonc` et de variables du dépôt.
@@ -77,7 +86,7 @@ R2 offre 10 Go gratuits : les vidéos les consomment vite. `MAX_MEDIA_BYTES` (10
 ## Limites connues
 
 - Les vidéos Reddit sont archivées sans le son (Reddit sert la piste audio séparément).
-- Au premier passage, seule la page la plus récente de chaque créateur est archivée ; l'historique plus ancien n'est pas rapatrié.
+- Au premier passage, seule la page la plus récente de chaque créateur est archivée ; l'historique plus ancien n'est pas rapatrié, ni par la collecte planifiée ni par la synchronisation manuelle.
 - Une publication Bluesky antidatée (date de création antérieure au curseur) peut être ignorée.
 - Pas de purge automatique des contenus supprimés par leurs auteurs (décision de projet). Voir l'écart documenté avec les conditions de Reddit dans la spec.
 

@@ -1,3 +1,4 @@
+import { syncCreator } from "../collect";
 import { createConnectors } from "../connectors";
 import { isPlatform } from "../connectors/types";
 import { Budget } from "../lib/budget";
@@ -136,6 +137,10 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         throw new HttpError(400, "Confirmation incorrecte : retapez le nom exact du créateur");
       }
       return json(await purgeBatch(env, id));
+    }
+
+    if (id && action === "sync" && method === "POST") {
+      return json(await syncCreator(env, id));
     }
 
     if (id && action === "verify" && method === "POST") {
