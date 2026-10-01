@@ -1,6 +1,6 @@
 import { api, ApiError } from "../api";
-import { fmtCatalogNo, fmtDate, h, platformLabel, plural, svgIcon } from "../dom";
-import { navigate } from "../router";
+import { fmtCatalogNo, fmtDate, h, platformLabel, plural, svgIcon, toast } from "../dom";
+import { navigate, refreshView } from "../router";
 import type { Creator, Filters, Post } from "../types";
 
 export interface GalleryState {
@@ -166,27 +166,12 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
           { class: "creator-actions" },
           h(
             "button",
-            {
-              type: "button",
-              class: "btn",
-              disabled: unviewed === 0,
-              onclick: async () => {
-                await api.setViewed("creator", headed.id, true);
-                applyFilters({});
-              },
-            },
+            { type: "button", class: "btn", disabled: unviewed === 0, onclick: (e: Event) => void markAll(e, headed, true) },
             "Tout marquer consulté",
           ),
           h(
             "button",
-            {
-              type: "button",
-              class: "btn btn-quiet",
-              onclick: async () => {
-                await api.setViewed("creator", headed.id, false);
-                applyFilters({});
-              },
-            },
+            { type: "button", class: "btn btn-quiet", onclick: (e: Event) => void markAll(e, headed, false) },
             "Tout marquer non consulté",
           ),
           h("a", { class: "btn btn-quiet", href: "/createurs", "data-link": true }, "Gérer les créateurs"),
@@ -346,4 +331,19 @@ export function refreshTile(grid: Element | null, post: Post, onOpen: (post: Pos
   const index = tiles.findIndex((t) => t.dataset["postId"] === post.id);
   const fresh = renderTile(post, onOpen);
   if (index >= 0) tiles[index]?.replaceWith(fresh);
+}
+
+/** Marque tous les médias d'un créateur comme consultés ou non, puis rafraîchit la galerie. */
+async function markAll(event: Event, creator: Creator, viewed: boolean): Promise<void> {
+  const button = event.currentTarget as HTMLButtonElement;
+  const buttons = [...(button.parentElement?.querySelectorAll("button") ?? [button])];
+  for (const b of buttons) b.disabled = true;
+  try {
+    await api.setViewed("creator", creator.id, viewed);
+    toast(viewed ? `${creator.handle} : tout marqué consulté` : `${creator.handle} : tout marqué non consulté`);
+    refreshView();
+  } catch (e) {
+    toast(e instanceof ApiError ? e.message : "Action impossible. Vérifiez la connexion, puis réessayez.");
+    for (const b of buttons) b.disabled = false;
+  }
 }

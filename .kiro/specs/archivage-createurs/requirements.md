@@ -63,7 +63,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 ### Médias consultés et non consultés
 12. QUAND l'utilisateur ouvre un média dans la visionneuse, LE SYSTÈME DOIT l'enregistrer comme consulté, avec la date de première consultation.
 13. LE SYSTÈME DOIT distinguer visuellement les miniatures des médias non consultés de celles des médias consultés, autrement que par la seule couleur.
-14. LE SYSTÈME DOIT permettre de marquer manuellement un média, une publication ou tout un créateur comme consulté ou non consulté.
+14. LE SYSTÈME DOIT permettre de marquer manuellement un média, une publication ou tout un créateur comme consulté ou non consulté ; après un marquage de tout un créateur, LE SYSTÈME DOIT rafraîchir l'affichage (tuiles et compteurs) à la fin du traitement, sans action de l'utilisateur.
 15. QUAND l'utilisateur active le filtre « non consultés », LE SYSTÈME DOIT n'afficher que les publications ayant au moins un média non consulté.
 16. LE SYSTÈME DOIT afficher, par créateur, le nombre de médias non consultés.
 
