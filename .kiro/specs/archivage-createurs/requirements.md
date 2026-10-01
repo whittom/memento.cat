@@ -80,12 +80,17 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 3. PENDANT la vérification, LE SYSTÈME DOIT afficher la progression et respecter les quotas de l'exigence 2.6.
 4. QUAND une publication Bluesky n'est plus disponible, LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, et conserver la copie archivée, sous réserve de Q2.
 5. QUAND une publication Reddit n'est plus disponible, LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, comme pour Bluesky.
+6. QUAND une publication Mastodon n'est plus disponible sur son serveur (erreur 404 ou 410), LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, comme pour Bluesky ; toute autre erreur (connexion exigée, serveur indisponible) NE DOIT PAS la faire passer à « supprimé ».
 
 ## Exigence 6 — Conformité aux plateformes
 1. LE SYSTÈME DOIT n'utiliser que les API officielles des plateformes.
 2. LE SYSTÈME DOIT s'authentifier auprès de Reddit par OAuth et envoyer un User-Agent conforme au format imposé.
 3. LE SYSTÈME NE DOIT PAS dépasser 100 requêtes par minute (moyenne sur 10 minutes) vers Reddit.
 4. LE SYSTÈME NE DOIT activer le connecteur Reddit qu'après approbation de la demande d'accès.
+5. LE SYSTÈME DOIT lire Mastodon (et les serveurs compatibles, comme Pixelfed) en lecture seule, par l'API publique du serveur du créateur, sans authentification ni identifiant, et envoyer un User-Agent identifiable.
+6. SI un serveur Mastodon exige une connexion pour lire un compte, ALORS LE SYSTÈME DOIT refuser l'ajout ou la collecte avec un message explicite, sans tenter de contourner la restriction.
+7. LE SYSTÈME DOIT respecter les en-têtes de quota Mastodon (`X-RateLimit-Remaining`, `X-RateLimit-Reset`) comme ceux des autres plateformes (exigence 2.6).
+8. LE SYSTÈME DOIT n'appeler que des serveurs désignés par un nom d'hôte public valide (pas d'adresse IP, de port ni de nom local) pour un compte Mastodon.
 
 ## Exigence 8 — Configuration et secrets
 1. LE SYSTÈME DOIT stocker la liste des créateurs suivis dans D1, gérée depuis la galerie (ajout, désactivation, suppression logique ou physique, restauration) ; elle n'est jamais versionnée dans le dépôt.
@@ -100,4 +105,5 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 - **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1. Écart assumé avec les conditions Reddit, à réévaluer lors de la demande d'accès.
 - **Q2 — Bluesky et le contenu supprimé.** Vérifier dans les conditions développeur de Bluesky si la conservation d'une publication supprimée est permise. Le choix de ne pas purger s'applique aussi à Bluesky en v1.
 - **Q4 — Vidéos Reddit.** La vidéo archivée est la version sans piste audio (Reddit sert l'audio séparément). Ajouter l'audio exigerait un assemblage hors du Worker.
+- **Q5 — Mastodon et le contenu supprimé.** Le fediverse n'a pas de conditions d'API uniformes : chaque serveur fixe ses règles, et la culture du réseau attend que les suppressions se propagent. Par cohérence avec Bluesky, une publication Mastodon supprimée garde sa copie avec le statut « supprimé » (usage strictement personnel). À réévaluer, notamment si un serveur l'interdit.
 - **Q3 — Volume.** Estimer le volume vidéo par créateur pour valider les 10 Go gratuits de R2.

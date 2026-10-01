@@ -41,7 +41,7 @@ export async function renderCreators(root: HTMLElement): Promise<void> {
       h("h2", {}, followed.length > 0 ? plural(followed.length, "créateur", "créateurs") : "Aucun créateur suivi"),
       followed.length > 0
         ? h("ul", { class: "creator-list" }, ...followed.map((c) => creatorRow(c, refresh)))
-        : h("p", { class: "muted" }, "Ajoutez un compte Bluesky ou Reddit ci-dessus. Ses nouvelles publications seront archivées toutes les 15 minutes."),
+        : h("p", { class: "muted" }, "Ajoutez un compte Bluesky, Mastodon ou Reddit ci-dessus. Ses nouvelles publications seront archivées toutes les 15 minutes."),
     ),
     trashed.length > 0
       ? h(
@@ -57,8 +57,22 @@ export async function renderCreators(root: HTMLElement): Promise<void> {
 
 function addForm(refresh: () => void): HTMLElement {
   const error = h("p", { class: "form-error", role: "alert" });
-  const platform = h("select", { name: "platform", required: true }, h("option", { value: "bluesky" }, "Bluesky"), h("option", { value: "reddit" }, "Reddit"));
-  const handle = h("input", { name: "handle", required: true, autocomplete: "off", placeholder: "exemple.bsky.social ou nom Reddit" });
+  const platform = h(
+    "select",
+    { name: "platform", required: true },
+    h("option", { value: "bluesky" }, "Bluesky"),
+    h("option", { value: "mastodon" }, "Mastodon"),
+    h("option", { value: "reddit" }, "Reddit"),
+  );
+  const placeholders: Record<string, string> = {
+    bluesky: "exemple.bsky.social",
+    mastodon: "nom@serveur.social",
+    reddit: "nom d'utilisateur Reddit",
+  };
+  const handle = h("input", { name: "handle", required: true, autocomplete: "off", placeholder: placeholders["bluesky"] });
+  platform.addEventListener("change", () => {
+    handle.placeholder = placeholders[platform.value] ?? "";
+  });
   const submit = h("button", { type: "submit", class: "btn btn-primary" }, "Suivre");
   return h(
     "form",

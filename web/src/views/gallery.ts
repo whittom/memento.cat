@@ -246,6 +246,7 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
             { name: "platform", onchange: (e: Event) => applyFilters({ platform: (e.target as HTMLSelectElement).value || undefined }) },
             h("option", { value: "" }, "Toutes"),
             h("option", { value: "bluesky", selected: filters.platform === "bluesky" }, "Bluesky"),
+            h("option", { value: "mastodon", selected: filters.platform === "mastodon" }, "Mastodon"),
             h("option", { value: "reddit", selected: filters.platform === "reddit" }, "Reddit"),
           ),
         ),

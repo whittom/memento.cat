@@ -1,4 +1,4 @@
-export type Platform = "bluesky" | "reddit";
+export type Platform = "bluesky" | "reddit" | "mastodon";
 export type CreatorState = "active" | "paused" | "deleted" | "purging";
 
 export interface Creator {

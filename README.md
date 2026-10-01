@@ -1,6 +1,6 @@
 # memento
 
-Archive personnelle des publications de créateurs suivis sur Bluesky et Reddit, avec une galerie de consultation monopage et adaptative. Le tout tourne dans un seul Cloudflare Worker (plan gratuit), avec D1 pour l'index et R2 pour les médias.
+Archive personnelle des publications de créateurs suivis sur Bluesky, Mastodon et Reddit, avec une galerie de consultation monopage et adaptative. Le tout tourne dans un seul Cloudflare Worker (plan gratuit), avec D1 pour l'index et R2 pour les médias.
 
 La démarche est pilotée par spécifications (format Kiro) :
 
@@ -61,6 +61,17 @@ npm test
 6. **Déployer** : `npm run deploy`
 
 Ajoutez ensuite vos créateurs depuis la page « Créateurs » de la galerie : la liste vit dans D1, jamais dans le dépôt.
+
+## Plateformes prises en charge
+
+| Plateforme | Identifiant à saisir | Accès |
+| --- | --- | --- |
+| Bluesky | `nom.bsky.social` | API publique, sans configuration |
+| Mastodon (et compatibles, comme Pixelfed) | `nom@serveur.social` | API publique du serveur du créateur, sans compte ni clé |
+| Reddit | nom d'utilisateur | OAuth, après approbation de Reddit (voir plus bas) |
+
+- **Mastodon** : seuls les messages avec images, vidéos ou GIF du créateur sont archivés, sans republications ni réponses à d'autres comptes. Un serveur qui exige une connexion pour lire les profils ne peut pas être suivi. Les messages supprimés gardent leur copie avec le statut « supprimé » (question ouverte Q5 de la spec).
+- Aucune configuration de secret n'est nécessaire pour Bluesky et Mastodon.
 
 ## Synchronisation manuelle
 
