@@ -2,6 +2,12 @@ import { api } from "../api";
 import { fmtCatalogNo, fmtDate, fmtDateTime, h, platformLabel, setChildren, svgIcon, toast } from "../dom";
 import type { Media, Post } from "../types";
 import { markViewed } from "../views-queue";
+import { fullResolutionSize, relativePointInContain, scrollToCenter, type Point } from "../zoom";
+
+/** Distance (px) au-delà de laquelle un appui de souris est un glissement et non un clic. */
+const DRAG_THRESHOLD = 4;
+/** Déplacement (px) d'une flèche du clavier quand l'image est agrandie. */
+const PAN_STEP = 120;
 
 export interface ViewerOptions {
   /** Publications voisines (ordre de la galerie), pour passer d'une publication à l'autre. */
@@ -41,11 +47,12 @@ export function openViewer(opts: ViewerOptions): Viewer {
   const prevBtn = h("button", { type: "button", class: "viewer-nav viewer-prev", "aria-label": "Précédent", onclick: () => step(-1) }, svgIcon("prev"));
   const nextBtn = h("button", { type: "button", class: "viewer-nav viewer-next", "aria-label": "Suivant", onclick: () => step(1) }, svgIcon("next"));
   const closeBtn = h("button", { type: "button", class: "viewer-close", "aria-label": "Fermer", onclick: () => close() }, svgIcon("close"));
+  const zoomBtn = h("button", { type: "button", class: "viewer-close viewer-zoom", hidden: true, onclick: () => setZoom(!zoomed) });
 
   const dialog = h(
     "div",
     { class: "viewer", role: "dialog", "aria-modal": "true", "aria-label": "Visionneuse" },
-    h("div", { class: "viewer-top" }, position, closeBtn),
+    h("div", { class: "viewer-top" }, position, h("div", { class: "viewer-tools" }, zoomBtn, closeBtn)),
     h("div", { class: "viewer-body" }, prevBtn, stage, nextBtn),
     strip,
     h("details", { class: "viewer-details" }, h("summary", {}, "Détails de la publication"), info, actions),
@@ -54,6 +61,55 @@ export function openViewer(opts: ViewerOptions): Viewer {
   document.body.classList.add("viewer-open");
 
   const current = (): Post | undefined => opts.posts[postIndex];
+
+  // --- Loupe : pleine résolution (un pixel d'image pour un pixel d'écran) ---
+  let zoomed = false;
+
+  const stageImage = (): HTMLImageElement | null => stage.querySelector("img");
+
+  function updateZoomButton(): void {
+    zoomBtn.hidden = stageImage() === null;
+    zoomBtn.setAttribute("aria-pressed", String(zoomed));
+    const label = zoomed ? "Revenir à l'affichage ajusté" : "Agrandir à la pleine résolution";
+    zoomBtn.setAttribute("aria-label", label);
+    zoomBtn.title = label;
+    zoomBtn.replaceChildren(svgIcon(zoomed ? "zoom-out" : "zoom-in"));
+  }
+
+  /** `at` : point cliqué (coordonnées de la fenêtre), pour agrandir autour de lui ; sinon le centre. */
+  function setZoom(on: boolean, at?: Point): void {
+    const img = stageImage();
+    if (!img) return;
+    if (on && !img.naturalWidth) {
+      // Image pas encore chargée : on agrandira dès qu'elle l'est.
+      img.addEventListener("load", () => setZoom(true, at), { once: true });
+      return;
+    }
+    const area = { width: stage.clientWidth, height: stage.clientHeight };
+    const natural = { width: img.naturalWidth, height: img.naturalHeight };
+    const focus = on
+      ? at
+        ? relativePointInContain({ x: at.x - stage.getBoundingClientRect().left, y: at.y - stage.getBoundingClientRect().top }, area, natural)
+        : { x: 0.5, y: 0.5 }
+      : undefined;
+
+    zoomed = on;
+    stage.classList.toggle("is-zoomed", on);
+    if (on && focus) {
+      const size = fullResolutionSize(natural, window.devicePixelRatio);
+      img.style.width = `${size.width}px`;
+      img.style.height = `${size.height}px`;
+      const target = scrollToCenter(focus, size, area);
+      stage.scrollLeft = target.left;
+      stage.scrollTop = target.top;
+    } else {
+      img.style.width = "";
+      img.style.height = "";
+      stage.scrollLeft = 0;
+      stage.scrollTop = 0;
+    }
+    updateZoomButton();
+  }
 
   function step(delta: number): void {
     const post = current();
@@ -176,6 +232,10 @@ export function openViewer(opts: ViewerOptions): Viewer {
     const count = post.media.length;
 
     stage.replaceChildren(renderMedia(post, media));
+    // Un nouveau média s'ouvre toujours à l'affichage ajusté.
+    zoomed = false;
+    stage.classList.remove("is-zoomed", "is-dragging");
+    updateZoomButton();
     setChildren(
       position,
       h("span", { class: "viewer-handle" }, post.creator.handle),
@@ -243,7 +303,25 @@ export function openViewer(opts: ViewerOptions): Viewer {
   function onKey(e: KeyboardEvent): void {
     if (e.key === "Escape") {
       e.preventDefault();
-      close();
+      // Premier appui : revenir à l'affichage ajusté ; second appui : fermer.
+      if (zoomed) setZoom(false);
+      else close();
+    } else if ((e.key === "z" || e.key === "Z") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      setZoom(!zoomed);
+    } else if ((e.key === "+" || e.key === "=") && !zoomed) {
+      e.preventDefault();
+      setZoom(true);
+    } else if ((e.key === "-" || e.key === "_") && zoomed) {
+      e.preventDefault();
+      setZoom(false);
+    } else if (zoomed && (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      // Image agrandie : les flèches déplacent l'image au lieu de changer de média.
+      e.preventDefault();
+      stage.scrollBy({
+        left: e.key === "ArrowRight" ? PAN_STEP : e.key === "ArrowLeft" ? -PAN_STEP : 0,
+        top: e.key === "ArrowDown" ? PAN_STEP : e.key === "ArrowUp" ? -PAN_STEP : 0,
+      });
     } else if (e.key === "ArrowRight") {
       step(1);
     } else if (e.key === "ArrowLeft") {
@@ -269,7 +347,8 @@ export function openViewer(opts: ViewerOptions): Viewer {
   let startY = 0;
   let tracking = false;
   stage.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse") return;
+    // Agrandie, l'image se déplace au toucher (défilement natif) : pas de balayage de navigation.
+    if (e.pointerType === "mouse" || zoomed) return;
     tracking = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -281,6 +360,43 @@ export function openViewer(opts: ViewerOptions): Viewer {
     const dy = e.clientY - startY;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1);
     else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) close();
+  });
+
+  // Souris : glisser déplace l'image agrandie ; un simple clic sur l'image bascule la loupe.
+  let drag: { x: number; y: number; left: number; top: number; moved: boolean } | null = null;
+  let ignoreClick = false;
+
+  stage.addEventListener("pointerdown", (e) => {
+    if (!zoomed || e.pointerType !== "mouse" || e.button !== 0) return;
+    drag = { x: e.clientX, y: e.clientY, left: stage.scrollLeft, top: stage.scrollTop, moved: false };
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
+      drag.moved = true;
+      stage.classList.add("is-dragging");
+    }
+    if (drag.moved) {
+      stage.scrollLeft = drag.left - dx;
+      stage.scrollTop = drag.top - dy;
+    }
+  });
+  const endDrag = (): void => {
+    if (!drag) return;
+    // Le clic qui suit un glissement ne doit pas basculer la loupe.
+    ignoreClick = drag.moved;
+    drag = null;
+    stage.classList.remove("is-dragging");
+    window.setTimeout(() => (ignoreClick = false), 0);
+  };
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
+  stage.addEventListener("click", (e) => {
+    if (ignoreClick || !(e.target instanceof HTMLImageElement)) return;
+    setZoom(!zoomed, { x: e.clientX, y: e.clientY });
   });
 
   document.addEventListener("keydown", onKey);

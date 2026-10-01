@@ -329,11 +329,15 @@ main:focus { outline: none; }
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .viewer :focus-visible { outline-color: var(--on-loupe); }
+/* Visionneuse toujours sombre : barres de défilement natives comprises (image agrandie). */
+.viewer { color-scheme: dark; }
 
 .viewer-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.5rem 0.5rem 0.5rem 1rem; }
 .viewer-position { margin: 0; display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: var(--step--1); color: #c7ced3; }
 .viewer-handle { color: var(--on-loupe); font-weight: 700; }
 .viewer-count { font-weight: 800; color: var(--on-loupe); }
+
+.viewer-tools { display: flex; align-items: center; gap: 0.25rem; }
 
 .viewer-close, .viewer-nav {
   display: grid; place-items: center; width: 2.75rem; height: 2.75rem;
@@ -349,6 +353,18 @@ main:focus { outline: none; }
 .viewer-stage img, .viewer-stage video {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
 }
+.viewer-stage img { cursor: zoom-in; }
+
+/* Loupe : l'image prend sa taille naturelle (taille fixée en JS, un pixel d'image pour un pixel d'écran) ; la zone défile. */
+.viewer-stage.is-zoomed {
+  overflow: auto; display: grid; touch-action: pan-x pan-y; overscroll-behavior: contain;
+}
+.viewer-stage.is-zoomed img {
+  position: static; margin: auto; max-width: none; max-height: none; object-fit: none; cursor: zoom-out;
+}
+.viewer-stage.is-dragging { user-select: none; }
+.viewer-stage.is-dragging img { cursor: grabbing; }
+
 .viewer-stage .viewer-missing, .viewer-stage .viewer-text {
   position: absolute; inset: 0; margin: auto; height: fit-content; overflow-y: auto; max-height: 100%;
 }

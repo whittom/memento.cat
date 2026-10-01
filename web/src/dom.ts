@@ -21,7 +21,7 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = 
   return el;
 }
 
-export function svgIcon(name: "stack" | "play" | "close" | "prev" | "next" | "external"): SVGSVGElement {
+export function svgIcon(name: "stack" | "play" | "close" | "prev" | "next" | "external" | "zoom-in" | "zoom-out"): SVGSVGElement {
   const paths: Record<string, string> = {
     stack: "M4 7h11v11H4z M7 4h13v13",
     play: "M8 5v14l11-7z",
@@ -29,6 +29,8 @@ export function svgIcon(name: "stack" | "play" | "close" | "prev" | "next" | "ex
     prev: "M15 5l-7 7 7 7",
     next: "M9 5l7 7-7 7",
     external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
+    "zoom-in": "M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15zM16 16l5 5M10.5 7.5v6M7.5 10.5h6",
+    "zoom-out": "M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15zM16 16l5 5M7.5 10.5h6",
   };
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
