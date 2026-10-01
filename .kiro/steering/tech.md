@@ -15,9 +15,10 @@ inclusion: always
 ## Commandes
 - `npx wrangler dev` : exécution locale (D1 et R2 émulés localement, sert aussi d'option d'hébergement sur un portable).
 - `npx wrangler types` : régénère `Env` après tout changement de liaison.
-- `npx wrangler d1 migrations apply memento-db` : migrations de schéma.
-- `npm test`, `npm run lint`, `npm run build`.
-- `npx wrangler deploy` : déploiement.
+- `npm run db:migrate` (`--remote`) et `npm run db:migrate:local` : migrations de schéma (`wrangler d1 migrations apply memento-db`).
+- `npm run typecheck`, `npm run lint`, `npm test` : vérifications, toutes attendues sans erreur.
+- `npm run build:web` : compilation de la galerie vers `web/dist`.
+- `npm run deploy` : compile la galerie puis déploie (`wrangler deploy` seul publierait une galerie périmée).
 
 ## Contraintes du plan gratuit
 - 5 déclencheurs Cron par compte : un seul déclencheur pour tout le projet, toutes les 15 minutes.

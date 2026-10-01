@@ -90,6 +90,8 @@ Le schéma de référence est `migrations/0001_init.sql` (tables `creators`, `po
 
 Points notables :
 - `creators.platform` : `bluesky`, `reddit` ou `mastodon`, validé dans le code (`isPlatform`) ; la migration `0002_platform_libre.sql` retire la contrainte `CHECK` de `0001`, pour que l'ajout d'une plateforme ne demande plus de reconstruire la table.
+- Index : `0001` indexe les publications (par créateur et date, par date, par vérification) ; `0003_index_cles_media.sql` indexe `media.r2_key` et `media.thumb_r2_key`, car chaque média servi vérifie que sa clé appartient à une publication visible (sans index, chaque miniature lisait toute la table `media`).
+- Reconstruction de l'index (`/api/admin/reindex`) : un créateur absent est recréé « désactivé », et son curseur avance jusqu'à la plus récente publication archivée (jamais en arrière).
 - `creators.state` : `active`, `paused`, `deleted`, `purging` ; `creators.cursor` : date ISO de la dernière publication archivée.
 - `posts.native_ref` : URI `at://` (Bluesky) ou fullname `t3_` (Reddit), utilisée pour la vérification des suppressions.
 - `media.etag` : empreinte MD5 calculée par R2 ; `media.viewed_at` : première consultation ; `media.downloaded = 0` si le média dépasse la taille maximale ou était indisponible.
@@ -200,8 +202,9 @@ SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtra
 - L'état de la visionneuse est dans l'URL (`/publication/:id?media=2`), pour que le bouton Retour la ferme.
 
 ## Sécurité
-- Cloudflare Access devant l'ensemble du domaine (galerie et API). Le Worker vérifie aussi le jeton Access (signature RS256, audience, émetteur, expiration) sur chaque requête, y compris pour la galerie (`run_worker_first`), et `workers_dev` est désactivé. En local, `REQUIRE_ACCESS=false`.
-- Les requêtes qui modifient des données exigent `Content-Type: application/json`, ce qui bloque les envois de formulaires depuis un autre site.
+- Cloudflare Access devant l'ensemble du domaine (galerie et API). Le Worker vérifie aussi le jeton Access (signature RS256, audience, émetteur, expiration) sur chaque requête, y compris pour la galerie (`run_worker_first`), et `workers_dev` est désactivé. En local, `REQUIRE_ACCESS=false` (dans `.dev.vars`).
+- Les clés publiques d'Access sont mises en cache une heure (Cache API). Un identifiant de clé absent du cache (rotation par Cloudflare) provoque une relecture à la source, au plus une fois par minute, pour ne pas bloquer l'accès jusqu'à l'expiration du cache.
+- Toutes les requêtes qui modifient des données (`POST`, `PATCH`, `DELETE`) exigent `Content-Type: application/json`, même avec un corps vide (`{}`), ce qui bloque les envois de formulaires depuis un autre site.
 - Identifiants Reddit en secrets Wrangler.
 - Aucune route publique.
 
@@ -211,10 +214,11 @@ SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtra
 
 ## Tests
 État actuel : tests unitaires Vitest exécutés sous Node (`npm test`), dans `test/`, avec des données écrites à la main et une base D1 factice.
-- Connecteurs (`bluesky.test.ts`, `reddit.test.ts`) : correspondance des réponses d'API vers `NormalizedPost`, y compris republications, citations d'un autre compte, vidéos, galeries Reddit et détection d'une publication Reddit supprimée (aucun test de ce genre côté Bluesky). Les réponses sont des objets écrits dans les tests, non des réponses enregistrées.
+- Connecteurs (`bluesky.test.ts`, `reddit.test.ts`, `mastodon.test.ts`) : correspondance des réponses d'API vers `NormalizedPost`, y compris republications, citations d'un autre compte, republications croisées Reddit, originaux Bluesky, vidéos, galeries Reddit et détection d'une publication Reddit supprimée. Pour Mastodon, en plus : validation des noms de serveur, conversion du HTML, quota en horodatage ISO, et le connecteur entier avec des appels réseau simulés (résolution, pagination, curseur, vérification des suppressions). Aucun test de suppression côté Bluesky. Les réponses sont des objets écrits dans les tests, non des réponses enregistrées.
 - Stockage et API (`storage.test.ts`) : clés R2, extensions, `Budget` et `countingDb`, limiteur de quota, requête de recherche FTS, curseur de pagination et bornes de dates.
 - Collecte et synchronisation manuelle (`sync.test.ts`) : refus selon l'état du créateur, doublons, avancée du curseur, publications sans média, arrêt par budget. La base D1 y est simulée.
-- Contrôle Access (`access.test.ts`) : jetons RS256 générés dans les tests (valide, falsifié, expiré, autre audience, autre émetteur, clé inconnue).
-- Galerie : contrôle visuel manuel aux largeurs 390 et 1280 px, non automatisé.
+- Contrôle Access (`access.test.ts`) : jetons RS256 générés dans les tests (valide, falsifié, expiré, autre audience, autre émetteur, clé inconnue), et cache des clés avec relecture en cas de rotation (Cache API et `fetch` simulés).
+- Loupe (`zoom.test.ts`) : taille à la pleine résolution, repérage d'un clic dans l'image ajustée, marges d'ajustement, défilement initial.
+- Galerie : contrôle visuel manuel aux largeurs 390 et 1280 px, et essais manuels de la visionneuse sur une instance locale ; non automatisé.
 
 À venir (tâche 1.7 du plan) : tests d'intégration dans le runtime Workers avec D1 et R2 réels (`@cloudflare/vitest-pool-workers`), et réponses d'API réelles enregistrées comme fixtures.

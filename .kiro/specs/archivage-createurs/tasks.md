@@ -67,6 +67,15 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 5b.4 `checkStates` Mastodon : 404 ou 410 = supprimé, toute autre erreur laisse le statut inchangé. _Exig. 5.6_
 - [x] 5b.5 Galerie : choix de la plateforme, libellés et filtre. _Exig. 1.1_
 
+## Revue du 2026-10-01 (livrée en `v0.1.11`)
+- [x] R.1 Index sur les clés R2 des médias (migration `0003`) : plus de lecture complète de `media` à chaque média servi.
+- [x] R.2 Clés Access : relecture à la source en cas de rotation (au plus une fois par minute).
+- [x] R.3 Corps JSON exigé aussi sur la restauration, la synchronisation manuelle et la mise à la corbeille.
+- [x] R.4 Reddit : écarter les republications croisées (crossposts). _Exig. 2.3b_
+- [x] R.5 Reconstruction de l'index : SQL déplacé dans `db.ts`, curseur avancé à la plus récente publication archivée.
+- [x] R.6 `npm run typecheck` sans erreur (tests d'accès sans dépendance aux types de Node).
+- [x] R.7 Documentation alignée sur le code (README, steering, conception).
+
 ## Phase 6 — Mise en service → `v1.0`
 - [x] 6.1 Cloudflare Access devant la galerie et l'API (application `memento.cat`, politique limitée au propriétaire, équipe `whittom`) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
 - [ ] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, à faire.

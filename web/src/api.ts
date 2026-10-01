@@ -26,7 +26,8 @@ export const api = {
   addCreator: (platform: string, handle: string) => request<{ creator: Creator }>("/creators", post({ platform, handle })),
   setState: (id: string, state: "active" | "paused") =>
     request<{ creator: Creator }>(`/creators/${enc(id)}`, { method: "PATCH", body: JSON.stringify({ state }) }),
-  trash: (id: string) => request<{ creator: Creator }>(`/creators/${enc(id)}?mode=logical`, { method: "DELETE" }),
+  // Corps JSON vide : l'API exige application/json sur toute requête qui modifie des données.
+  trash: (id: string) => request<{ creator: Creator }>(`/creators/${enc(id)}?mode=logical`, { method: "DELETE", body: "{}" }),
   restore: (id: string) => request<{ creator: Creator }>(`/creators/${enc(id)}/restore`, post({})),
   stats: (id: string) => request<{ posts: number; media: number; bytes: number }>(`/creators/${enc(id)}/stats`),
   purge: (id: string, confirm?: string) =>

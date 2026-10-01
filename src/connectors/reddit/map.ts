@@ -93,6 +93,8 @@ export function mapSubmission(child: Json, creatorId: string): NormalizedPost | 
   const c = obj(child);
   const data = obj(c?.["data"]);
   if (!c || str(c["kind"]) !== "t3" || !data) return null;
+  // Republication croisée (crosspost) : le contenu vient d'un autre compte (exigence 2.3b).
+  if (str(data["crosspost_parent"]) || arr(data["crosspost_parent_list"]).length > 0) return null;
   const fullname = str(data["name"]);
   const id = str(data["id"]);
   const created = num(data["created_utc"]);

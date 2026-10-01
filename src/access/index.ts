@@ -39,20 +39,37 @@ export async function assertAccess(request: Request, config: Config, keyFinder: 
   if (str(payload["iss"]) !== `https://${config.accessTeamDomain}`) throw new HttpError(403, "Émetteur du jeton inattendu");
 }
 
-async function findKey(teamDomain: string, kid: string | undefined): Promise<JsonWebKey | undefined> {
+/** Délai minimal entre deux relectures forcées des clés (un identifiant de clé inconnu ne doit pas déclencher un appel à chaque requête). */
+const REFRESH_FLOOR_MS = 60_000;
+const FETCHED_AT = "x-memento-fetched-at";
+
+function keyIn(body: Json | undefined, kid: string | undefined): JsonWebKey | undefined {
+  const match = arr(obj(body)?.["keys"]).map((k) => obj(k)).find((k) => str(k?.["kid"]) === kid);
+  return match as JsonWebKey | undefined;
+}
+
+/**
+ * Clés publiques de l'équipe Access, mises en cache une heure. Une clé absente du cache (rotation
+ * des clés par Cloudflare) provoque une relecture à la source, au plus une fois par minute.
+ */
+export async function findKey(teamDomain: string, kid: string | undefined): Promise<JsonWebKey | undefined> {
   const url = `https://${teamDomain}/cdn-cgi/access/certs`;
   const cache = caches.default;
-  let res = await cache.match(url);
-  if (!res) {
-    const fresh = await fetch(url);
-    if (!fresh.ok) throw new HttpError(503, "Clés Cloudflare Access indisponibles");
-    res = new Response(fresh.body, fresh);
-    res.headers.set("cache-control", "max-age=3600");
-    await cache.put(url, res.clone());
+  const cached = await cache.match(url);
+  if (cached) {
+    const hit = keyIn(await cached.clone().json(), kid);
+    if (hit) return hit;
+    const fetchedAt = Number(cached.headers.get(FETCHED_AT) ?? 0);
+    if (Date.now() - fetchedAt < REFRESH_FLOOR_MS) return undefined;
   }
-  const keys = arr(obj((await res.json()))?.["keys"]);
-  const match = keys.map((k) => obj(k)).find((k) => str(k?.["kid"]) === kid);
-  return match as JsonWebKey | undefined;
+  const fresh = await fetch(url);
+  if (!fresh.ok) throw new HttpError(503, "Clés Cloudflare Access indisponibles");
+  const body = await fresh.text();
+  await cache.put(
+    url,
+    new Response(body, { headers: { "content-type": "application/json", "cache-control": "max-age=3600", [FETCHED_AT]: String(Date.now()) } }),
+  );
+  return keyIn(JSON.parse(body) as Json, kid);
 }
 
 function readCookie(request: Request, name: string): string | null {

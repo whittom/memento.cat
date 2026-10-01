@@ -108,6 +108,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     }
 
     if (id && !action && method === "DELETE") {
+      await readBody(request); // exige application/json, comme toute requête qui modifie des données
       const creator = await requireCreator(env, id);
       if (url.searchParams.get("mode") !== "logical") {
         throw new HttpError(400, "Utilisez mode=logical, ou POST /purge pour une suppression définitive");
@@ -118,6 +119,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     }
 
     if (id && action === "restore" && method === "POST") {
+      await readBody(request);
       const creator = await requireCreator(env, id);
       if (creator.state !== "deleted") throw new HttpError(409, "Seul un créateur dans la corbeille peut être restauré");
       await setCreatorState(env.DB, id, "paused", null);
@@ -140,6 +142,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     }
 
     if (id && action === "sync" && method === "POST") {
+      await readBody(request);
       return json(await syncCreator(env, id));
     }
 
