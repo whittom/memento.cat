@@ -28,6 +28,11 @@ export function navigate(url: string, replace = false): void {
   for (const fn of listeners) fn();
 }
 
+/** Redessine la vue courante à partir de l'API, même si l'adresse n'a pas changé. */
+export function refreshView(): void {
+  window.dispatchEvent(new Event("memento:refresh"));
+}
+
 window.addEventListener("popstate", () => {
   for (const fn of listeners) fn();
 });

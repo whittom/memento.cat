@@ -138,6 +138,12 @@ async function render(): Promise<void> {
 }
 
 onNavigate(() => void render());
+window.addEventListener("memento:refresh", () => {
+  // Oublie la galerie en mémoire pour forcer un nouveau chargement des publications et des compteurs.
+  galleryKey = null;
+  gallery = null;
+  void render();
+});
 void flushPendingViews();
 void render();
 
