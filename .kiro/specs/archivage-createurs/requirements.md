@@ -97,7 +97,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 2. LE SYSTÈME DOIT offrir une exportation complète de l'archive (médias et `post.json`) vers un dossier local.
 
 ## Questions ouvertes
-- **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1 (voir exigence 5). Écart assumé avec les conditions Reddit, à réévaluer lors de la demande d'accès.
+- **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1. Écart assumé avec les conditions Reddit, à réévaluer lors de la demande d'accès.
 - **Q2 — Bluesky et le contenu supprimé.** Vérifier dans les conditions développeur de Bluesky si la conservation d'une publication supprimée est permise. Le choix de ne pas purger s'applique aussi à Bluesky en v1.
 - **Q4 — Vidéos Reddit.** La vidéo archivée est la version sans piste audio (Reddit sert l'audio séparément). Ajouter l'audio exigerait un assemblage hors du Worker.
 - **Q3 — Volume.** Estimer le volume vidéo par créateur pour valider les 10 Go gratuits de R2.
