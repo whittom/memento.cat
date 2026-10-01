@@ -1,8 +1,8 @@
 import type { Budget } from "../lib/budget";
 import type { Config } from "../lib/config";
 
-export type Platform = "bluesky" | "reddit";
-export const PLATFORMS: readonly Platform[] = ["bluesky", "reddit"];
+export type Platform = "bluesky" | "reddit" | "mastodon";
+export const PLATFORMS: readonly Platform[] = ["bluesky", "reddit", "mastodon"];
 
 export type MediaKind = "image" | "video" | "gif";
 
@@ -16,7 +16,7 @@ export interface NormalizedMedia {
   height: number | null;
   thumbWidth: number | null;
   thumbHeight: number | null;
-  /** Texte alternatif (Bluesky) ou légende d'élément de galerie (Reddit). */
+  /** Texte alternatif (Bluesky, Mastodon) ou légende d'élément de galerie (Reddit). */
   description: string | null;
 }
 
@@ -25,7 +25,7 @@ export interface NormalizedPost {
   id: string;
   platform: Platform;
   creatorId: string;
-  /** URI at:// (Bluesky) ou fullname t3_ (Reddit), pour les vérifications. */
+  /** URI at:// (Bluesky), fullname t3_ (Reddit) ou URL de l'API du message (Mastodon), pour les vérifications. */
   nativeRef: string;
   /** Identifiant natif court, utilisé dans les clés R2. */
   nativeId: string;

@@ -76,7 +76,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       const body = await readBody(request);
       const platform = body["platform"];
       const handle = str(body["handle"])?.trim();
-      if (!isPlatform(platform)) throw new HttpError(400, "Plateforme non prise en charge (bluesky ou reddit)");
+      if (!isPlatform(platform)) throw new HttpError(400, "Plateforme non prise en charge (bluesky, reddit ou mastodon)");
       if (!handle) throw new HttpError(400, "Identifiant du créateur manquant");
       const config = readConfig(env);
       const connector = createConnectors({ env, config, budget: new Budget(5) })[platform];

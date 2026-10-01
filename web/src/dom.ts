@@ -74,7 +74,8 @@ export function toast(message: string): void {
   toastTimer = window.setTimeout(() => el.classList.remove("show"), 4000);
 }
 
-export const platformLabel = (p: string): string => (p === "bluesky" ? "Bluesky" : p === "reddit" ? "Reddit" : p);
+const PLATFORM_LABELS: Record<string, string> = { bluesky: "Bluesky", reddit: "Reddit", mastodon: "Mastodon" };
+export const platformLabel = (p: string): string => PLATFORM_LABELS[p] ?? p;
 
 const present = (children: Child[]): (Node | string)[] =>
   children.filter((c): c is Node | string => c !== null && c !== undefined && c !== false);

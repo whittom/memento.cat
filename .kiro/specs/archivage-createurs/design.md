@@ -72,21 +72,24 @@ export interface Connector {
 Le curseur est une date ISO conservée dans `creators.cursor`, mise à jour par `collect/` (`advanceCursor`), et non renvoyée par le connecteur.
 
 ## Correspondance par plateforme
-| Élément | Bluesky | Reddit |
-| --- | --- | --- |
-| Créateur | DID via `app.bsky.actor.getProfile` | nom d'utilisateur (`/user/<nom>/about`) |
-| Publications | `app.bsky.feed.getAuthorFeed`, sans réponses ; écartés : republications (`reason`), publications d'un autre auteur, citations d'un autre compte (`embed` de type `app.bsky.embed.record#view` dont l'auteur n'est pas le créateur). Une citation avec médias propres (`recordWithMedia`) est conservée | `/user/<nom>/submitted` |
-| Titre | aucun | `title` |
-| Texte | `record.text` | `selftext` |
-| Médias | images et vidéo intégrées | image `i.redd.it`, galerie (`media_metadata`), vidéo `v.redd.it` |
-| Description du média | `alt` de chaque image | légende de l'élément de galerie |
-| Suppression | URI absente de `app.bsky.feed.getPosts` | `/api/info?id=t3_…` : auteur `[deleted]` ou contenu retiré |
-| Conséquence | statut « supprimé », copie conservée | statut « supprimé », copie conservée (pas de purge en v1) |
+| Élément | Bluesky | Reddit | Mastodon (et compatibles : Pixelfed…) |
+| --- | --- | --- | --- |
+| Créateur | DID via `app.bsky.actor.getProfile` | nom d'utilisateur (`/user/<nom>/about`) | `nom@serveur` ; identifiant numérique via `GET /api/v1/accounts/lookup?acct=` sur le serveur du créateur |
+| Publications | `app.bsky.feed.getAuthorFeed`, sans réponses ; écartés : republications (`reason`), publications d'un autre auteur, citations d'un autre compte (`embed` de type `app.bsky.embed.record#view` dont l'auteur n'est pas le créateur). Une citation avec médias propres (`recordWithMedia`) est conservée | `/user/<nom>/submitted` | `GET /api/v1/accounts/:id/statuses?only_media=true&exclude_reblogs=true&exclude_replies=true`, pagination par `max_id` ; le serveur écarte déjà republications, réponses à autrui et publications sans média |
+| Titre | aucun | `title` | `spoiler_text` (avertissement de contenu), sinon aucun |
+| Texte | `record.text` | `selftext` | `content` (HTML converti en texte brut) |
+| Médias | images et vidéo intégrées | image `i.redd.it`, galerie (`media_metadata`), vidéo `v.redd.it` | `media_attachments` : `image`, `video` et `gifv` (boucle sans son, traitée comme GIF) ; l'audio est ignoré |
+| Description du média | `alt` de chaque image | légende de l'élément de galerie | `description` de la pièce jointe |
+| Suppression | URI absente de `app.bsky.feed.getPosts` | `/api/info?id=t3_…` : auteur `[deleted]` ou contenu retiré | `GET /api/v1/statuses/:id` répond 404 ou 410 (toute autre erreur laisse le statut inchangé) |
+| Conséquence | statut « supprimé », copie conservée | statut « supprimé », copie conservée (pas de purge en v1) | statut « supprimé », copie conservée (Q5) |
+
+Mastodon : identifiants `mastodon:<serveur>:<id du compte>` (créateur) et `mastodon:<serveur>:<id du message>` (publication), car les identifiants numériques ne sont uniques que par serveur. Le champ `creators.handle` conserve `nom@serveur`, dont le connecteur déduit le serveur à interroger. `nativeRef` est l'URL de l'API du message (`https://<serveur>/api/v1/statuses/<id>`). Le nom du serveur est validé (nom d'hôte public, sans adresse IP ni port). Le quota se lit dans `X-RateLimit-Remaining` et `X-RateLimit-Reset` (horodatage ISO 8601).
 
 ## Modèle de données (D1)
 Le schéma de référence est `migrations/0001_init.sql` (tables `creators`, `posts`, `media`, table virtuelle FTS5 `posts_fts`). FTS5 est validé en local avec D1.
 
 Points notables :
+- `creators.platform` : `bluesky`, `reddit` ou `mastodon`, validé dans le code (`isPlatform`) ; la migration `0002_platform_libre.sql` retire la contrainte `CHECK` de `0001`, pour que l'ajout d'une plateforme ne demande plus de reconstruire la table.
 - `creators.state` : `active`, `paused`, `deleted`, `purging` ; `creators.cursor` : date ISO de la dernière publication archivée.
 - `posts.native_ref` : URI `at://` (Bluesky) ou fullname `t3_` (Reddit), utilisée pour la vérification des suppressions.
 - `media.etag` : empreinte MD5 calculée par R2 ; `media.viewed_at` : première consultation ; `media.downloaded = 0` si le média dépasse la taille maximale ou était indisponible.
@@ -100,6 +103,8 @@ Les Workers du plan gratuit ne conviennent pas au redimensionnement d'images (te
 | Bluesky, vidéo | `thumbnail` de la vue vidéo | fichier d'origine sur le serveur (PDS) de l'auteur, via `com.atproto.sync.getBlob` |
 | Reddit, image ou galerie | plus petite résolution de `preview` ou de `media_metadata` (≈ 320 px) | `i.redd.it` d'origine |
 | Reddit, vidéo | image d'aperçu | `fallback_url` de `v.redd.it` (sans audio) |
+| Mastodon, image | `preview_url` (≈ 400 px, dimensions dans `meta.small`) | `url` (original du serveur, sans recompression) |
+| Mastodon, vidéo ou `gifv` | `preview_url` (image fixe) | `url` (fichier du serveur) |
 
 Clés R2 : `.../media_01.<ext>` et `.../media_01.thumb.<ext>`, où l'extension se déduit du type MIME renvoyé par la source, sinon de l'URL, sinon du genre de média (`jpg` pour une image, `mp4` pour une vidéo). Les fichiers sont conservés tels que la source les sert : les images Bluesky sont les originaux de l'auteur (`.jpg`, `.png`, etc. selon le type renvoyé par son serveur), tandis que leurs miniatures viennent du CDN de Bluesky, qui répond en WebP (`.thumb.webp`). Sans miniature, la galerie affiche le média complet réduit en CSS (`object-fit: cover`), chargé paresseusement. Option à évaluer plus tard : un service de transformation d'images (vérifier son coût avant de l'activer).
 

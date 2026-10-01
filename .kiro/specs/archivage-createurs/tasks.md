@@ -54,6 +54,13 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 5.3 Limiteur calé sur 100 requêtes/minute et les en-têtes `X-Ratelimit-*`. _Exig. 6.3_
 - [x] 5.4 `checkStates` Reddit et statut « supprimé ». _Exig. 5.5_
 
+## Phase 5b — Connecteur Mastodon (livré en `v0.1.5`)
+- [x] 5b.1 Migration `0002_platform_libre.sql` : retirer la contrainte `CHECK` sur `creators.platform` (reconstruction de la table, données conservées). _Exig. 1.1_
+- [x] 5b.2 Connecteur Mastodon : `resolveCreator` (validation du serveur), `fetchSince` sans republications ni réponses, conversion du HTML, images, vidéos et `gifv`. _Exig. 2.2, 3b, 6.5, 6.6, 6.8_
+- [x] 5b.3 Limiteur : lecture de `X-RateLimit-Reset` en horodatage ISO. _Exig. 6.7_
+- [x] 5b.4 `checkStates` Mastodon : 404 ou 410 = supprimé, toute autre erreur laisse le statut inchangé. _Exig. 5.6_
+- [x] 5b.5 Galerie : choix de la plateforme, libellés et filtre. _Exig. 1.1_
+
 ## Phase 6 — Mise en service → `v1.0`
 - [x] 6.1 Cloudflare Access devant la galerie et l'API (application `memento.cat`, politique limitée au propriétaire, équipe `whittom`) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
 - [ ] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, à faire.
