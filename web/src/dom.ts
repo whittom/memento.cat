@@ -47,6 +47,9 @@ const dateTimeFmt = new Intl.DateTimeFormat("fr-CA", { dateStyle: "medium", time
 export const fmtDate = (iso: string): string => dateFmt.format(new Date(iso));
 export const fmtDateTime = (iso: string): string => dateTimeFmt.format(new Date(iso));
 
+/** Numéro d'inventaire du catalogue, sur quatre chiffres au moins : « n° 0042 ». */
+export const fmtCatalogNo = (n: number): string => `n° ${String(n).padStart(4, "0")}`;
+
 export function fmtBytes(n: number): string {
   if (n < 1024) return `${n} o`;
   const units = ["Ko", "Mo", "Go"];

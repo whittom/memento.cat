@@ -8,6 +8,7 @@ export function mediaUrl(key: string | null): string | null {
 export function presentPost(row: PostListRow, media: MediaRow[]) {
   return {
     id: row.id,
+    catalogNo: row.catalog_no,
     creator: { id: row.creator_id, handle: row.handle, displayName: row.display_name, platform: row.platform },
     publishedAt: row.published_at,
     capturedAt: row.captured_at,

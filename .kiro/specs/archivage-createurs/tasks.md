@@ -38,6 +38,8 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Une étiquette Git cl�
 
 - [x] 3.11 Synchronisation manuelle d'un créateur : `collectCreator` partagé, `POST /api/creators/:id/sync`, bouton « Synchroniser maintenant » avec progression. _Exig. 2.9–2.12_
 
+- [x] 3.12 Refonte visuelle « catalogue » : fiches numérotées, logo memento.cat avec tête de chat, icône d'onglet, thème sombre. _Exig. 4.1, 4.2, 4.8_
+
 ## Phase 4 — Vérification des suppressions → `v0.4`
 - [x] 4.1 `checkStates` Bluesky (`getPosts` par lot). _Exig. 5.1_
 - [x] 4.2 Endpoint de vérification par lot et boucle de progression dans la galerie. _Exig. 5.2, 5.3_
