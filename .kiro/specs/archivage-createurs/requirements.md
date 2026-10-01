@@ -67,6 +67,10 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 15. QUAND l'utilisateur active le filtre « non consultés », LE SYSTÈME DOIT n'afficher que les publications ayant au moins un média non consulté.
 16. LE SYSTÈME DOIT afficher, par créateur, le nombre de médias non consultés.
 
+### Navigation par créateur
+20. QUAND un créateur est sélectionné dans la galerie, que ce soit par le filtre « Créateur » ou par sa page, LE SYSTÈME DOIT afficher son nom, sa plateforme, son identifiant et ses actions de consultation (« Tout marquer consulté », « Tout marquer non consulté »), de la même façon dans les deux cas.
+21. LE SYSTÈME DOIT permettre d'ouvrir la page d'un créateur depuis chacune de ses tuiles, sans passer par la liste de gestion.
+
 ### Groupes de médias
 17. QUAND une publication comporte plusieurs médias, LE SYSTÈME DOIT les présenter comme un groupe visuellement identifiable dans la galerie : une seule tuile, le premier média en miniature, un indicateur de pile et le nombre d'éléments.
 18. QUAND l'utilisateur ouvre un groupe, LE SYSTÈME DOIT afficher la position dans le groupe (ex. 2/5) et une bande de miniatures du groupe, et limiter la navigation suivant/précédent aux éléments du groupe avant de passer à la publication suivante.
