@@ -17,4 +17,4 @@ Règles du projet (pas de guide officiel unique pour ce domaine).
 - Miniatures d'abord : la grille ne charge jamais la version complète d'un média, sauf en l'absence de miniature.
 - Indicateur « non consulté » : pastille avec texte ou icône, jamais la couleur seule.
 - Groupe de médias : toujours identifiable par l'effet de pile et le compteur, sur toutes les largeurs d'écran.
-- Visionneuse : focus piégé tant qu'elle est ouverte, rendu au déclencheur à la fermeture ; flèches, Échap et balayage pris en charge. Loupe sur les images : pleine résolution (1 pixel d'image pour 1 pixel d'écran), déplacement au glissement et au clavier, retour par Échap ; le zoom ne change jamais l'état « consulté ».
+- Visionneuse : focus piégé tant qu'elle est ouverte, rendu au déclencheur à la fermeture ; flèches, Échap et balayage pris en charge. Loupe sur les images : pleine résolution (1 pixel d'image pour 1 pixel d'écran), déplacement au glissement et au clavier, retour par Échap ; le zoom ne change jamais l'état « consulté ». Un clic en dehors de l'image (fond, marges d'ajustement) ferme la visionneuse ; un clic sur l'image ouvre la loupe.
