@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapFeedItem, parseAtUri } from "../src/connectors/bluesky/map";
+import { cidFromCdnUrl, mapFeedItem, parseAtUri } from "../src/connectors/bluesky/map";
 
 const did = "did:plc:abc123";
 const video = (cid: string) => `https://pds.example/blob/${cid}`;
@@ -76,6 +76,29 @@ describe("Bluesky : correspondance des publications", () => {
     expect(p?.media).toHaveLength(2);
     expect(p?.media[0]).toMatchObject({ kind: "image", sourceUrl: "https://cdn/f1", thumbUrl: "https://cdn/t1", description: "Un chat", width: 1200 });
     expect(p?.media[1]?.description).toBeNull();
+  });
+
+  it("archive l'original d'une image (blob du PDS) et garde la miniature du CDN", () => {
+    const cid = "bafkreiemdqvtypezwk5wbmtlw4ktwqta2cfrgqfhthqu5cihklj7tjlkie";
+    const p = mapFeedItem(
+      item({}, {
+        embed: {
+          $type: "app.bsky.embed.images#view",
+          images: [{ thumb: "https://cdn/t", fullsize: `https://cdn.bsky.app/img/feed_fullsize/plain/${did}/${cid}@jpeg`, alt: "" }],
+        },
+      }),
+      did,
+      video,
+    );
+    expect(p?.media[0]).toMatchObject({ kind: "image", sourceUrl: `https://pds.example/blob/${cid}`, thumbUrl: "https://cdn/t" });
+  });
+
+  it("extrait le CID d'une URL du CDN, sans se tromper sur une autre forme d'URL", () => {
+    const cid = "bafkreiemdqvtypezwk5wbmtlw4ktwqta2cfrgqfhthqu5cihklj7tjlkie";
+    expect(cidFromCdnUrl(`https://cdn.bsky.app/img/feed_fullsize/plain/${did}/${cid}`)).toBe(cid);
+    expect(cidFromCdnUrl(`https://cdn.bsky.app/img/feed_fullsize/plain/${did}/${cid}@webp`)).toBe(cid);
+    expect(cidFromCdnUrl("https://cdn/f1")).toBeUndefined();
+    expect(cidFromCdnUrl("pas une url")).toBeUndefined();
   });
 
   it("extrait la vidéo d'une publication avec citation", () => {
