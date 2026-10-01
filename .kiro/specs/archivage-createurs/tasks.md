@@ -1,11 +1,11 @@
 # Plan de réalisation
 
-Chaque tâche renvoie aux exigences de `requirements.md`. Une étiquette Git clôt chaque phase.
+Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N` nommées par phase ci-dessous étaient le plan initial ; le dépôt a en pratique été livré d'un bloc en `v0.1` (2026-09-30), puis versionné par incréments `v0.1.x` (`v0.1.1` synchronisation manuelle, `v0.1.2` citations Bluesky, `v0.1.3` refonte visuelle). `v1.0` est réservé à la fin de la phase 6.
 
 ## Phase 0 — Préalables
-- [ ] 0.1 Pousser le dépôt Git (déjà initialisé localement) sur GitHub.
-- [ ] 0.2 Créer le compte Cloudflare, le bucket R2 `memento-media` et la base D1 `memento-db`.
-- [ ] 0.3 Déposer la demande d'accès à l'API Reddit (délai inconnu : à lancer dès maintenant). _Exig. 6.4_
+- [x] 0.1 Pousser le dépôt Git sur GitHub (dépôt privé `whittom/memento.cat`).
+- [x] 0.2 Créer le compte Cloudflare, le bucket R2 `memento-media` et la base D1 `memento-db`.
+- [ ] 0.3 Déposer la demande d'accès à l'API Reddit (délai inconnu : à lancer dès maintenant). Brouillon prêt dans `docs/reddit-access-request.md`, non envoyé. _Exig. 6.4_
 - [x] 0.4 Trancher Q1 : Reddit conservé, sans purge en v1.
 - [x] 0.5 Ajouter `.gitignore` (`wrangler.jsonc`, `.dev.vars`, `.env`, `node_modules`, `dist`) et `wrangler.example.jsonc`. _Exig. 8.2_
 
@@ -14,7 +14,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Une étiquette Git cl�
 - [x] 1.2 Liaisons D1 et R2, `wrangler types`, ESLint (`no-floating-promises`), Vitest (tests unitaires).
 - [ ] 1.7 Tests d'intégration dans le runtime Workers (`@cloudflare/vitest-pool-workers`, D1 et R2 réels).
 - [x] 1.3 Migration D1 initiale ; valider FTS5. _Exig. 3_
-- [x] 1.4 Module `storage/` : clés R2, écriture diffusée des médias, SHA-256, `post.json`, insertion idempotente. _Exig. 3.1–3.3, 2.4_
+- [x] 1.4 Module `storage/` : clés R2, écriture diffusée des médias, empreinte MD5 calculée par R2 (un SHA-256 dans le Worker dépasserait la limite de temps processeur), `post.json`, insertion idempotente. _Exig. 3.1–3.3, 2.4_
 - [x] 1.6 Archivage des miniatures fournies par les plateformes et des dimensions. _Exig. 3.5_
 - [x] 1.5 Script de reconstruction de l'index depuis `post.json`. _Exig. 3.4_
 
@@ -22,7 +22,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Une étiquette Git cl�
 - [x] 2.1 `connectors/types.ts` et limiteur de quota générique. _Exig. 2.6_
 - [x] 2.2 Connecteur Bluesky : `resolveCreator`, `fetchSince` (sans réponses), extraction des `alt`. _Exig. 1.1, 2.2, 2.3_
 - [x] 2.3 Orchestration `scheduled()` : un créateur en échec n'arrête pas les autres ; curseur mis à jour après succès. _Exig. 2.1, 2.5, 2.7_
-- [x] 2.4 Déclencheur Cron (horaire par défaut) ; essai en local avec `wrangler dev`. _Exig. 7.1_
+- [x] 2.4 Déclencheur Cron (toutes les 15 minutes, petits lots) ; essai en local avec `wrangler dev`. _Exig. 7.1_
 
 ## Phase 3 — API et galerie → `v0.3`
 - [x] 3.1 Routes créateurs : liste, ajout, désactivation et réactivation. _Exig. 1.1–1.3_
@@ -52,8 +52,8 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Une étiquette Git cl�
 - [x] 5.4 `checkStates` Reddit et statut « supprimé ». _Exig. 5.5_
 
 ## Phase 6 — Mise en service → `v1.0`
-- [ ] 6.1 Cloudflare Access devant la galerie et l'API ; test d'accès refusé. _Exig. 4.7_
-- [ ] 6.2 Déploiement, suivi des journaux sur une semaine.
+- [x] 6.1 Cloudflare Access devant la galerie et l'API (application `memento.cat`, politique limitée au propriétaire, équipe `whittom`) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
+- [ ] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, à faire.
 - [x] 6.3 Exportation complète vers un dossier local et procédure de sauvegarde (rclone, voir README). _Exig. 7.2_
 - [ ] 6.5 Premier passage réel sur Bluesky et Reddit : valider les correspondances sur des réponses réelles.
 - [ ] 6.4 Point sur le volume R2 (Q3).

@@ -24,32 +24,52 @@ flowchart LR
 ```
 
 ## Interfaces des connecteurs
+Le code de référence est `src/connectors/types.ts` ; en voici l'essentiel.
+
 ```ts
 export interface NormalizedMedia {
-  sourceUrl: string;
-  mimeType: string;
-  description: string | null; // alt Bluesky, légende de galerie Reddit
+  kind: "image" | "video" | "gif";
+  sourceUrl: string;              // version complète
+  thumbUrl: string | null;        // miniature fournie par la plateforme
+  width: number | null;
+  height: number | null;
+  thumbWidth: number | null;      // toujours null pour Bluesky
+  thumbHeight: number | null;
+  description: string | null;     // alt Bluesky, légende de galerie Reddit
 }
 
 export interface NormalizedPost {
-  id: string;                 // "<plateforme>:<id natif>"
+  id: string;                     // "<plateforme>:<id natif>"
   platform: "bluesky" | "reddit";
   creatorId: string;
-  publishedAt: string;        // ISO 8601 UTC
+  nativeRef: string;              // URI at:// (Bluesky) ou fullname t3_ (Reddit), pour la vérification
+  nativeId: string;               // identifiant court, utilisé dans les clés R2
+  publishedAt: string;            // ISO 8601 UTC
   title: string | null;
   text: string;
   sourceUrl: string;
   media: NormalizedMedia[];
 }
 
-export type PostState = "active" | "deleted" | "unknown";
+export interface ResolvedCreator { id: string; handle: string; displayName: string | null }
+
+export type PostState = "active" | "deleted";
+
+export interface FetchResult {
+  posts: NormalizedPost[];        // plus récentes que le curseur, de la plus ancienne à la plus récente
+  reachedCursor: boolean;         // faux si la limite de pages est atteinte avant le curseur (trou possible)
+}
 
 export interface Connector {
-  resolveCreator(handle: string): Promise<{ creatorId: string; displayName: string }>;
-  fetchSince(creatorId: string, cursor: string | null): Promise<{ posts: NormalizedPost[]; cursor: string | null }>;
-  checkStates(postIds: string[]): Promise<Map<string, PostState>>;
+  readonly platform: "bluesky" | "reddit";
+  readonly checkBatchSize: number;                            // références vérifiables par appel
+  resolveCreator(handle: string): Promise<ResolvedCreator>;
+  fetchSince(creator: { id: string; handle: string }, cursor: string | null): Promise<FetchResult>;
+  checkStates(nativeRefs: string[]): Promise<Map<string, PostState>>;   // référence absente = supprimée
 }
 ```
+
+Le curseur est une date ISO conservée dans `creators.cursor`, mise à jour par `collect/` (`advanceCursor`), et non renvoyée par le connecteur.
 
 ## Correspondance par plateforme
 | Élément | Bluesky | Reddit |
@@ -81,10 +101,10 @@ Les Workers du plan gratuit ne conviennent pas au redimensionnement d'images (te
 | Reddit, image ou galerie | plus petite résolution de `preview` ou de `media_metadata` (≈ 320 px) | `i.redd.it` d'origine |
 | Reddit, vidéo | image d'aperçu | `fallback_url` de `v.redd.it` (sans audio) |
 
-Clés R2 : `.../media_01.jpg` et `.../media_01.thumb.jpg`. Sans miniature, la galerie affiche le média complet réduit en CSS (`object-fit: cover`), chargé paresseusement. Option à évaluer plus tard : un service de transformation d'images (vérifier son coût avant de l'activer).
+Clés R2 : `.../media_01.<ext>` et `.../media_01.thumb.<ext>`, où l'extension se déduit du type MIME renvoyé par la source, sinon de l'URL, sinon du genre de média (`jpg` pour une image, `mp4` pour une vidéo). Les fichiers sont conservés tels que la source les sert : le CDN d'images de Bluesky répond en WebP, donc les images et miniatures Bluesky sont en `.webp`. Sans miniature, la galerie affiche le média complet réduit en CSS (`object-fit: cover`), chargé paresseusement. Option à évaluer plus tard : un service de transformation d'images (vérifier son coût avant de l'activer).
 
 ## Stockage (R2)
-- Clé : `<plateforme>/<créateur>/<AAAA>/<MM>/<AAAA-MM-JJ>_<id natif>/media_01.jpg`, `.../post.json`.
+- Clé : `<plateforme>/<créateur>/<AAAA>/<MM>/<AAAA-MM-JJ>_<id natif>/media_01.<ext>`, `.../post.json` (extension selon le type MIME, voir « Miniatures »).
 - `post.json` reprend `NormalizedPost` plus `capturedAt`, `status` et les empreintes des médias : c'est la source de vérité, D1 se reconstruit à partir d'elle.
 - Les médias sont diffusés de la plateforme vers R2 sans chargement complet en mémoire.
 
@@ -132,8 +152,8 @@ Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `dele
 - Une synchronisation manuelle simultanée à un passage planifié est sans danger : l'insertion des publications est idempotente.
 
 ## Vérification des suppressions
-- `POST /api/creators/:id/verify` traite un lot (par défaut 50 publications, les moins récemment vérifiées) et renvoie `{ traitées, restantes, supprimées }`.
-- La galerie rappelle l'endpoint jusqu'à `restantes = 0` et affiche la progression : aucun traitement long côté serveur, aucun déclenchement planifié.
+- `POST /api/creators/:id/verify` traite un lot de 25 publications (les moins récemment vérifiées lors de la session en cours) et renvoie `{ startedAt, processed, deleted, remaining }`. Le corps de la requête porte `startedAt` (`null` au premier appel) : la galerie le renvoie à chaque appel, ce qui délimite la session de vérification.
+- La galerie rappelle l'endpoint jusqu'à `remaining = 0` (ou `processed = 0`) et affiche la progression : aucun traitement long côté serveur, aucun déclenchement planifié.
 - Bluesky et Reddit : statut `deleted`, copie conservée. Purge reportée (voir exigences).
 
 ## API
@@ -155,7 +175,7 @@ Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `dele
 | POST | `/api/admin/reindex` | reconstruction de l'index D1 depuis les `post.json`, par lots (corps : `{ "cursor" }`) |
 
 ## Galerie
-SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtrable, fiche publication, gestion des créateurs (ajout, bouton « Synchroniser maintenant », désactiver/réactiver, supprimer avec choix logique ou physique, corbeille avec restauration), fiche créateur (avec bouton « Vérifier les suppressions »). La suppression physique demande de retaper le nom du créateur. Mise en page conçue d'abord pour le mobile ; grille de 1 à 4 colonnes selon la largeur.
+SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtrable, fiche publication, gestion des créateurs (ajout, bouton « Synchroniser maintenant », désactiver/réactiver, supprimer avec choix logique ou physique, corbeille avec restauration), fiche créateur (avec bouton « Vérifier les suppressions »). La suppression physique demande de retaper le nom du créateur. Mise en page conçue d'abord pour le mobile ; grille de 2, 3, 4 puis 5 colonnes aux points de rupture de 640, 1024 et 1536 px.
 
 ## Configuration et secrets
 | Élément | Où | Versionné ? |
@@ -183,7 +203,11 @@ SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtra
 - Journaux JSON structurés par créateur et par exécution ; observabilité Workers activée.
 
 ## Tests
-- Connecteurs : réponses d'API enregistrées (fixtures) rejouées, y compris cas de suppression.
-- Stockage et API : Vitest dans le runtime Workers avec D1 et R2 réels (`@cloudflare/vitest-plugin`).
-- Galerie : contrôle visuel aux largeurs 390 et 1280 px.
-- Contrôle Access : jetons RS256 générés dans les tests (valide, falsifié, expiré, autre audience, autre émetteur, clé inconnue).
+État actuel : tests unitaires Vitest exécutés sous Node (`npm test`), dans `test/`, avec des données écrites à la main et une base D1 factice.
+- Connecteurs (`bluesky.test.ts`, `reddit.test.ts`) : correspondance des réponses d'API vers `NormalizedPost`, y compris republications, citations d'un autre compte, vidéos, galeries Reddit et détection d'une publication Reddit supprimée (aucun test de ce genre côté Bluesky). Les réponses sont des objets écrits dans les tests, non des réponses enregistrées.
+- Stockage et API (`storage.test.ts`) : clés R2, extensions, `Budget` et `countingDb`, limiteur de quota, requête de recherche FTS, curseur de pagination et bornes de dates.
+- Collecte et synchronisation manuelle (`sync.test.ts`) : refus selon l'état du créateur, doublons, avancée du curseur, publications sans média, arrêt par budget. La base D1 y est simulée.
+- Contrôle Access (`access.test.ts`) : jetons RS256 générés dans les tests (valide, falsifié, expiré, autre audience, autre émetteur, clé inconnue).
+- Galerie : contrôle visuel manuel aux largeurs 390 et 1280 px, non automatisé.
+
+À venir (tâche 1.7 du plan) : tests d'intégration dans le runtime Workers avec D1 et R2 réels (`@cloudflare/vitest-pool-workers`), et réponses d'API réelles enregistrées comme fixtures.
