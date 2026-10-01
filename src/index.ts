@@ -4,18 +4,7 @@ import { runCollection } from "./collect";
 import { readConfig } from "./lib/config";
 import { HttpError, errorMessage } from "./lib/errors";
 import { log } from "./lib/log";
-
-const SECURITY_HEADERS: Record<string, string> = {
-  "x-content-type-options": "nosniff",
-  "referrer-policy": "no-referrer",
-  "x-frame-options": "DENY",
-};
-
-function withSecurityHeaders(res: Response): Response {
-  const out = new Response(res.body, res);
-  for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
-  return out;
-}
+import { withSecurityHeaders } from "./security";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

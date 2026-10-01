@@ -13,6 +13,7 @@ Règles du projet (pas de guide officiel unique pour ce domaine).
 - Images chargées paresseusement (`loading="lazy"`), dimensions réservées pour éviter les sauts de mise en page.
 - Accessibilité : texte alternatif archivé réutilisé comme `alt`, navigation au clavier, contraste AA.
 - La SPA ne parle qu'à `/api/*` ; aucun appel direct à une plateforme.
+- Politique de sécurité du contenu (CSP) stricte : aucun script ni style en ligne (pas de `<script>` sans `src`, pas d'attribut `style` ni `on*` dans le HTML, pas de `innerHTML`), aucune ressource externe autre que Google Fonts. Ajouter une origine externe exige de modifier `src/security.ts` et la spec.
 - Pagination par curseur (défilement infini ou bouton « Plus »).
 - Miniatures d'abord : la grille ne charge jamais la version complète d'un média, sauf en l'absence de miniature.
 - Indicateur « non consulté » : pastille avec texte ou icône, jamais la couleur seule.
