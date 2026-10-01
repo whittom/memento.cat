@@ -2,7 +2,7 @@ import { api } from "../api";
 import { fmtCatalogNo, fmtDate, fmtDateTime, h, platformLabel, setChildren, svgIcon, toast } from "../dom";
 import type { Media, Post } from "../types";
 import { markViewed } from "../views-queue";
-import { fullResolutionSize, relativePointInContain, scrollToCenter, type Point } from "../zoom";
+import { fullResolutionSize, isInsideContain, relativePointInContain, scrollToCenter, type Point } from "../zoom";
 
 /** Distance (px) au-delà de laquelle un appui de souris est un glissement et non un clic. */
 const DRAG_THRESHOLD = 4;
@@ -94,6 +94,7 @@ export function openViewer(opts: ViewerOptions): Viewer {
       : undefined;
 
     zoomed = on;
+    img.style.cursor = "";
     stage.classList.toggle("is-zoomed", on);
     if (on && focus) {
       const size = fullResolutionSize(natural, window.devicePixelRatio);
@@ -372,6 +373,10 @@ export function openViewer(opts: ViewerOptions): Viewer {
     drag = { x: e.clientX, y: e.clientY, left: stage.scrollLeft, top: stage.scrollTop, moved: false };
   });
   stage.addEventListener("pointermove", (e) => {
+    // Au-dessus des marges d'ajustement, un clic ferme : le curseur de loupe n'a plus de sens.
+    if (!drag && !zoomed && e.pointerType === "mouse" && e.target instanceof HTMLImageElement) {
+      e.target.style.cursor = onDrawnImage(e.target, e) ? "" : "default";
+    }
     if (!drag) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
@@ -396,12 +401,34 @@ export function openViewer(opts: ViewerOptions): Viewer {
   };
   stage.addEventListener("pointerup", endDrag);
   stage.addEventListener("pointercancel", endDrag);
+  /** Vrai si le clic tombe sur l'image dessinée (l'élément occupe toute la zone, l'image y est ajustée avec des marges). */
+  const onDrawnImage = (img: HTMLImageElement, e: MouseEvent): boolean => {
+    const r = img.getBoundingClientRect();
+    return isInsideContain({ x: e.clientX - r.left, y: e.clientY - r.top }, { width: r.width, height: r.height }, { width: img.naturalWidth, height: img.naturalHeight });
+  };
+
   stage.addEventListener("click", (e) => {
     if (ignoreClick) return;
-    // Agrandie, l'image peut être plus petite que la zone : un clic dans la marge revient aussi à l'affichage ajusté.
-    const onImage = e.target instanceof HTMLImageElement;
-    if (!onImage && !(zoomed && e.target === stage)) return;
-    setZoom(!zoomed, { x: e.clientX, y: e.clientY });
+    const img = e.target instanceof HTMLImageElement ? e.target : null;
+    if (zoomed) {
+      // Agrandie, l'image peut être plus petite que la zone : un clic dessus ou dans la marge revient à l'affichage ajusté.
+      if (img || e.target === stage) setZoom(false);
+      return;
+    }
+    if (img) {
+      // Un clic sur l'image ouvre la loupe ; un clic dans les marges d'ajustement ferme, comme le bouton X.
+      if (onDrawnImage(img, e)) setZoom(true, { x: e.clientX, y: e.clientY });
+      else close();
+    } else if (e.target === stage) {
+      close();
+    }
+  });
+
+  // Le fond du reste de la visionneuse (barre du haut, côtés, fenêtre) ferme aussi ; les commandes ne ferment pas.
+  dialog.addEventListener("click", (e) => {
+    if (ignoreClick) return;
+    const t = e.target;
+    if (t === dialog || (t instanceof HTMLElement && (t.classList.contains("viewer-top") || t.classList.contains("viewer-tools") || t.classList.contains("viewer-body")))) close();
   });
 
   document.addEventListener("keydown", onKey);

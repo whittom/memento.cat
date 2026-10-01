@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fullResolutionSize, relativePointInContain, scrollToCenter } from "../web/src/zoom";
+import { fullResolutionSize, isInsideContain, relativePointInContain, scrollToCenter } from "../web/src/zoom";
 
 describe("loupe : pleine résolution", () => {
   it("affiche un pixel d'image pour un pixel d'écran, selon la densité de l'écran", () => {
@@ -19,6 +19,24 @@ describe("loupe : pleine résolution", () => {
     expect(relativePointInContain({ x: 10, y: 250 }, area, natural).x).toBe(0);
     expect(relativePointInContain({ x: 990, y: 250 }, area, natural).x).toBe(1);
     expect(relativePointInContain({ x: 375, y: 125 }, area, natural)).toEqual({ x: 0.25, y: 0.25 });
+  });
+
+  it("distingue l'image dessinée des marges d'ajustement", () => {
+    // Zone 1000x500, image 2000x2000 ajustée en 500x500, dessinée de x = 250 à 750.
+    const area = { width: 1000, height: 500 };
+    const natural = { width: 2000, height: 2000 };
+    expect(isInsideContain({ x: 500, y: 250 }, area, natural)).toBe(true);
+    expect(isInsideContain({ x: 250, y: 0 }, area, natural)).toBe(true);
+    expect(isInsideContain({ x: 750, y: 500 }, area, natural)).toBe(true);
+    expect(isInsideContain({ x: 100, y: 250 }, area, natural)).toBe(false);
+    expect(isInsideContain({ x: 900, y: 250 }, area, natural)).toBe(false);
+    // Image plus large que haute : marges en haut et en bas.
+    expect(isInsideContain({ x: 500, y: 10 }, { width: 1000, height: 1000 }, { width: 2000, height: 1000 })).toBe(false);
+    expect(isInsideContain({ x: 500, y: 500 }, { width: 1000, height: 1000 }, { width: 2000, height: 1000 })).toBe(true);
+  });
+
+  it("ne considère jamais « en dehors » une image dont la taille est inconnue", () => {
+    expect(isInsideContain({ x: 5, y: 5 }, { width: 100, height: 100 }, { width: 0, height: 0 })).toBe(true);
   });
 
   it("ne plante pas sur une image ou une zone de taille nulle", () => {
