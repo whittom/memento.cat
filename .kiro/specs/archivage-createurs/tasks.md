@@ -75,6 +75,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] R.5 Reconstruction de l'index : SQL déplacé dans `db.ts`, curseur avancé à la plus récente publication archivée.
 - [x] R.6 `npm run typecheck` sans erreur (tests d'accès sans dépendance aux types de Node).
 - [x] R.7 Documentation alignée sur le code (README, steering, conception).
+- [x] R.8 En-tête `Content-Security-Policy` stricte, avec un test de compatibilité de la galerie (livré en `v0.1.12`). _Exig. 4.7_
 
 ## Phase 6 — Mise en service → `v1.0`
 - [x] 6.1 Cloudflare Access devant la galerie et l'API (application `memento.cat`, politique limitée au propriétaire, équipe `whittom`) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
