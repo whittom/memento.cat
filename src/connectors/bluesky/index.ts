@@ -45,7 +45,7 @@ export class BlueskyConnector implements Connector {
     const since = cursor ? Date.parse(cursor) : null;
     const maxPages = since === null ? 1 : this.ctx.config.maxPagesPerCreator;
     const collected: NormalizedPost[] = [];
-    const pendingVideos: { post: NormalizedPost; index: number; cid: string }[] = [];
+    const pendingBlobs: { post: NormalizedPost; index: number; cid: string }[] = [];
     let pageCursor: string | undefined;
     let reachedCursor = false;
 
@@ -56,16 +56,16 @@ export class BlueskyConnector implements Connector {
       const feed = arr(body?.["feed"]);
 
       for (const item of feed) {
-        // Les vidéos exigent le PDS de l'auteur : on le résout après coup, une seule fois.
-        const post = mapFeedItem(item, did, (cid) => `pending-video:${cid}`);
+        // Les originaux (vidéos et images) exigent le PDS de l'auteur : on le résout après coup, une seule fois.
+        const post = mapFeedItem(item, did, (cid) => `pending-blob:${cid}`);
         if (!post) continue;
         if (since !== null && Date.parse(post.publishedAt) <= since) {
           reachedCursor = true;
           continue;
         }
         post.media.forEach((m, index) => {
-          if (m.sourceUrl.startsWith("pending-video:")) {
-            pendingVideos.push({ post, index, cid: m.sourceUrl.slice("pending-video:".length) });
+          if (m.sourceUrl.startsWith("pending-blob:")) {
+            pendingBlobs.push({ post, index, cid: m.sourceUrl.slice("pending-blob:".length) });
           }
         });
         collected.push(post);
@@ -79,9 +79,9 @@ export class BlueskyConnector implements Connector {
     }
     if (since === null) reachedCursor = true;
 
-    if (pendingVideos.length > 0) {
+    if (pendingBlobs.length > 0) {
       const pds = await this.resolvePds(did);
-      for (const v of pendingVideos) {
+      for (const v of pendingBlobs) {
         const media = v.post.media[v.index];
         if (media) media.sourceUrl = blobUrl(pds, did, v.cid);
       }

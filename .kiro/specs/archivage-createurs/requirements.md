@@ -38,7 +38,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 
 ## Exigence 3 — Stockage
 1. LE SYSTÈME DOIT ranger chaque publication sous `<plateforme>/<créateur>/<AAAA>/<MM>/<AAAA-MM-JJ>_<id>/`, avec ses médias et un `post.json`.
-2. LE SYSTÈME DOIT conserver les médias sans recompression et enregistrer une empreinte de contenu par média (l'empreinte MD5 calculée par R2 ; un SHA-256 calculé dans le Worker dépasserait la limite de temps processeur du plan gratuit).
+2. LE SYSTÈME DOIT conserver les médias sans recompression (pour Bluesky, le fichier d'origine téléversé par l'auteur, non la version redimensionnée du CDN ; seules les miniatures peuvent être des versions recompressées fournies par la plateforme) et enregistrer une empreinte de contenu par média (l'empreinte MD5 calculée par R2 ; un SHA-256 calculé dans le Worker dépasserait la limite de temps processeur du plan gratuit).
 5. QUAND la plateforme fournit une miniature ou un aperçu réduit d'un média, LE SYSTÈME DOIT l'archiver à côté du média complet, avec les dimensions des deux versions.
 3. SI un média dépasse la taille maximale configurée, ALORS LE SYSTÈME DOIT archiver ses métadonnées et le marquer « non téléchargé ».
 4. LE SYSTÈME DOIT pouvoir reconstruire l'index D1 à partir des seuls fichiers `post.json`.

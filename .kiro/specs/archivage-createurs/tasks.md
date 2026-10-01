@@ -18,6 +18,9 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 1.6 Archivage des miniatures fournies par les plateformes et des dimensions. _Exig. 3.5_
 - [x] 1.5 Script de reconstruction de l'index depuis `post.json`. _Exig. 3.4_
 
+- [x] 1.8 Archiver les originaux des images Bluesky (blob du PDS de l'auteur) au lieu du WebP recompressé du CDN ; miniatures inchangées. _Exig. 3.2_
+- [ ] 1.9 Migrer les images Bluesky déjà archivées en WebP vers leurs originaux (opération ponctuelle). _Exig. 3.2_
+
 ## Phase 2 — Connecteur Bluesky et collecte → `v0.2`
 - [x] 2.1 `connectors/types.ts` et limiteur de quota générique. _Exig. 2.6_
 - [x] 2.2 Connecteur Bluesky : `resolveCreator`, `fetchSince` (sans réponses), extraction des `alt`. _Exig. 1.1, 2.2, 2.3_

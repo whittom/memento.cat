@@ -96,12 +96,12 @@ Les Workers du plan gratuit ne conviennent pas au redimensionnement d'images (te
 
 | Plateforme | Miniature | Version complète |
 | --- | --- | --- |
-| Bluesky, image | `thumb` de la vue de l'image | `fullsize` |
+| Bluesky, image | `thumb` de la vue de l'image (WebP du CDN) | fichier d'origine sur le serveur (PDS) de l'auteur, via `com.atproto.sync.getBlob` ; le CID du blob est extrait de l'URL `fullsize` du CDN. Si le CID est introuvable, repli sur `fullsize` (version recompressée) |
 | Bluesky, vidéo | `thumbnail` de la vue vidéo | fichier d'origine sur le serveur (PDS) de l'auteur, via `com.atproto.sync.getBlob` |
 | Reddit, image ou galerie | plus petite résolution de `preview` ou de `media_metadata` (≈ 320 px) | `i.redd.it` d'origine |
 | Reddit, vidéo | image d'aperçu | `fallback_url` de `v.redd.it` (sans audio) |
 
-Clés R2 : `.../media_01.<ext>` et `.../media_01.thumb.<ext>`, où l'extension se déduit du type MIME renvoyé par la source, sinon de l'URL, sinon du genre de média (`jpg` pour une image, `mp4` pour une vidéo). Les fichiers sont conservés tels que la source les sert : le CDN d'images de Bluesky répond en WebP, donc les images et miniatures Bluesky sont en `.webp`. Sans miniature, la galerie affiche le média complet réduit en CSS (`object-fit: cover`), chargé paresseusement. Option à évaluer plus tard : un service de transformation d'images (vérifier son coût avant de l'activer).
+Clés R2 : `.../media_01.<ext>` et `.../media_01.thumb.<ext>`, où l'extension se déduit du type MIME renvoyé par la source, sinon de l'URL, sinon du genre de média (`jpg` pour une image, `mp4` pour une vidéo). Les fichiers sont conservés tels que la source les sert : les images Bluesky sont les originaux de l'auteur (`.jpg`, `.png`, etc. selon le type renvoyé par son serveur), tandis que leurs miniatures viennent du CDN de Bluesky, qui répond en WebP (`.thumb.webp`). Sans miniature, la galerie affiche le média complet réduit en CSS (`object-fit: cover`), chargé paresseusement. Option à évaluer plus tard : un service de transformation d'images (vérifier son coût avant de l'activer).
 
 ## Stockage (R2)
 - Clé : `<plateforme>/<créateur>/<AAAA>/<MM>/<AAAA-MM-JJ>_<id natif>/media_01.<ext>`, `.../post.json` (extension selon le type MIME, voir « Miniatures »).
