@@ -1,6 +1,6 @@
 import { isPlatform, type NormalizedPost } from "../connectors/types";
 import { arr, bool, num, obj, str } from "../lib/json";
-import { insertPost, type MediaInsert } from "../storage/db";
+import { insertPost, upsertCreatorFromArchive, type MediaInsert } from "../storage/db";
 
 /**
  * Reconstruit l'index D1 à partir des post.json de R2, par lots de 12 objets listés
@@ -24,12 +24,14 @@ export async function reindexBatch(env: Env, cursor: string | undefined): Promis
     const creator = obj(data["creator"]);
     const capturedAt = str(data["capturedAt"]) ?? new Date().toISOString();
 
-    await env.DB.prepare(
-      `INSERT OR IGNORE INTO creators (id, platform, handle, display_name, state, created_at, cursor)
-       VALUES (?, ?, ?, ?, 'paused', ?, ?)`,
-    )
-      .bind(creatorId, platform, str(creator?.["handle"]) ?? creatorId, str(creator?.["displayName"]) ?? null, capturedAt, publishedAt)
-      .run();
+    await upsertCreatorFromArchive(env.DB, {
+      id: creatorId,
+      platform,
+      handle: str(creator?.["handle"]) ?? creatorId,
+      displayName: str(creator?.["displayName"]) ?? null,
+      createdAt: capturedAt,
+      cursor: publishedAt,
+    });
 
     const prefix = key.slice(0, -"post.json".length);
     const post: NormalizedPost = {

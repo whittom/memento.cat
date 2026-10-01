@@ -24,6 +24,12 @@ describe("Reddit : correspondance des publications", () => {
     });
   });
 
+  it("écarte les republications croisées (crossposts)", () => {
+    expect(mapSubmission({ kind: "t3", data: { ...base, crosspost_parent: "t3_autre" } }, "reddit:auteur")).toBeNull();
+    expect(mapSubmission({ kind: "t3", data: { ...base, crosspost_parent_list: [{ name: "t3_autre" }] } }, "reddit:auteur")).toBeNull();
+    expect(mapSubmission({ kind: "t3", data: { ...base, crosspost_parent_list: [] } }, "reddit:auteur")).not.toBeNull();
+  });
+
   it("extrait une galerie dans l'ordre, avec légendes et miniatures", () => {
     const media = mapMedia({
       ...base,

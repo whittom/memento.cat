@@ -7,11 +7,11 @@ La démarche est pilotée par spécifications (format Kiro) :
 - `.kiro/steering/` : contexte permanent et règles par technologie, tirées des guides officiels ;
 - `.kiro/specs/archivage-createurs/` : exigences (EARS), conception et plan de réalisation.
 
-Toute modification de comportement commence par la spec. Une étiquette Git clôt chaque phase du plan.
+Toute modification de comportement commence par la spec. Chaque livraison porte une étiquette Git (`v0.1`, puis `v0.1.1`, `v0.1.2`, etc. ; voir l'en-tête de `tasks.md`).
 
 ## Prérequis
 
-- Node.js 20 ou plus récent
+- Node.js 22.12 ou plus récent (exigé par Wrangler 4 et Vitest 5)
 - Un compte Cloudflare (le plan gratuit suffit)
 - Pour Reddit seulement : une application OAuth approuvée par Reddit (voir `.kiro/steering/reddit-api.md`)
 
@@ -58,9 +58,15 @@ npm test
    npx wrangler secret put REDDIT_CLIENT_SECRET
    ```
    Renseigner aussi `REDDIT_USER_AGENT` au format `<plateforme>:<id app>:<version> (by /u/<utilisateur>)`.
-6. **Déployer** : `npm run deploy`
+6. **Déployer** : `npm run deploy` (compile la galerie, puis publie le Worker ; `npx wrangler deploy` seul publierait une galerie périmée).
 
 Ajoutez ensuite vos créateurs depuis la page « Créateurs » de la galerie : la liste vit dans D1, jamais dans le dépôt.
+
+**Mise à jour** : après avoir récupéré une nouvelle version du code, appliquez d'abord les nouvelles migrations (`npm run db:migrate`), puis `npm run deploy`.
+
+### Déploiement automatique depuis GitHub (optionnel)
+
+Les jetons vont dans les secrets du dépôt GitHub (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), jamais dans le code. `wrangler.jsonc` n'étant pas versionné, l'intégration doit le générer à partir de `wrangler.example.jsonc` et de variables du dépôt.
 
 ## Plateformes prises en charge
 
@@ -80,11 +86,7 @@ En plus de la collecte planifiée (toutes les 15 minutes), le bouton **Synchroni
 - Le bouton n'apparaît que pour un créateur actif : réactivez d'abord un créateur désactivé, ou restaurez-le depuis la corbeille.
 - Comme la collecte planifiée, il ne rapatrie pas l'historique antérieur au curseur (voir « Limites connues »). Au premier passage d'un nouveau créateur, seule la page la plus récente est archivée.
 - En cas d'erreur ou d'interruption (quota, budget), le curseur est conservé : relancez pour reprendre.
-- API : `POST /api/creators/:id/sync` renvoie `{ "archived": <n>, "done": <booléen> }`.
-
-### Déploiement automatique depuis GitHub (optionnel)
-
-Les jetons vont dans les secrets du dépôt GitHub (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), jamais dans le code. `wrangler.jsonc` n'étant pas versionné, l'intégration doit le générer à partir de `wrangler.example.jsonc` et de variables du dépôt.
+- API : `POST /api/creators/:id/sync` (corps JSON, même vide) renvoie `{ "archived": <n>, "done": <booléen> }`.
 
 ## Limites du plan gratuit
 
@@ -99,7 +101,9 @@ R2 offre 10 Go gratuits : les vidéos les consomment vite. `MAX_MEDIA_BYTES` (10
 - Les vidéos Reddit sont archivées sans le son (Reddit sert la piste audio séparément).
 - Au premier passage, seule la page la plus récente de chaque créateur est archivée ; l'historique plus ancien n'est pas rapatrié, ni par la collecte planifiée ni par la synchronisation manuelle.
 - Une publication Bluesky antidatée (date de création antérieure au curseur) peut être ignorée.
-- Pas de purge automatique des contenus supprimés par leurs auteurs (décision de projet). Voir l'écart documenté avec les conditions de Reddit dans la spec.
+- Pas de purge automatique des contenus supprimés par leurs auteurs (décision de projet). Voir l'écart documenté avec les conditions de Reddit dans la spec, et la question Q5 pour Mastodon.
+- Quand un serveur Mastodon signale son quota atteint, la collecte suspend tous les créateurs Mastodon jusqu'au passage suivant, même ceux d'autres serveurs.
+- Les publications qui ne contiennent que du texte ne sont pas archivées, quelle que soit la plateforme (exigence 2.3c).
 
 ## Sauvegarde et exportation
 

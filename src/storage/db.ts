@@ -105,6 +105,27 @@ export async function insertCreator(
     .run();
 }
 
+/**
+ * Reconstruction de l'index : recrée un créateur absent à l'état « désactivé », et fait avancer son
+ * curseur jusqu'à la plus récente publication archivée. Les post.json sont listés du plus ancien au plus
+ * récent : sans cette mise à jour, le curseur resterait à la plus ancienne et une réactivation
+ * relirait inutilement tout l'historique déjà archivé. Un curseur plus récent n'est jamais reculé.
+ */
+export async function upsertCreatorFromArchive(
+  db: D1Database,
+  c: { id: string; platform: Platform; handle: string; displayName: string | null; createdAt: string; cursor: string },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO creators (id, platform, handle, display_name, state, created_at, cursor)
+       VALUES (?, ?, ?, ?, 'paused', ?, ?)
+       ON CONFLICT(id) DO UPDATE SET cursor = excluded.cursor
+       WHERE creators.cursor IS NULL OR excluded.cursor > creators.cursor`,
+    )
+    .bind(c.id, c.platform, c.handle, c.displayName, c.createdAt, c.cursor)
+    .run();
+}
+
 export async function setCreatorState(
   db: D1Database,
   id: string,

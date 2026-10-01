@@ -1,9 +1,9 @@
-import { webcrypto } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
-import { assertAccess } from "../src/access";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { assertAccess, findKey } from "../src/access";
 import type { Config } from "../src/lib/config";
 
-const subtle = webcrypto.subtle;
+// WebCrypto global (Node 20+ et runtime Workers) : pas de dépendance aux types de Node.
+const subtle = crypto.subtle;
 const team = "equipe.cloudflareaccess.com";
 const aud = "aud-memento";
 const config: Config = {
@@ -15,8 +15,12 @@ let privateKey: CryptoKey;
 let publicJwk: JsonWebKey;
 const finder = (_t: string, kid: string | undefined) => Promise.resolve(kid === "k1" ? publicJwk : undefined);
 
-const b64url = (b: Uint8Array | string) =>
-  Buffer.from(typeof b === "string" ? Buffer.from(b) : b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64url = (b: Uint8Array | string): string => {
+  const bytes = typeof b === "string" ? new TextEncoder().encode(b) : b;
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
 
 async function token(payload: Record<string, unknown>, kid = "k1"): Promise<string> {
   const head = b64url(JSON.stringify({ alg: "RS256", kid }));
@@ -29,13 +33,13 @@ const valid = () => ({ aud: [aud], iss: `https://${team}`, exp: Math.floor(Date.
 const req = (t?: string) => new Request("https://memento.example/", { headers: t ? { "cf-access-jwt-assertion": t } : {} });
 
 beforeAll(async () => {
-  const pair = await subtle.generateKey(
+  const pair = (await subtle.generateKey(
     { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
     true,
     ["sign", "verify"],
-  );
+  )) as CryptoKeyPair;
   privateKey = pair.privateKey;
-  publicJwk = await subtle.exportKey("jwk", pair.publicKey);
+  publicJwk = (await subtle.exportKey("jwk", pair.publicKey)) as JsonWebKey;
 });
 
 describe("contrôle Cloudflare Access", () => {
@@ -68,5 +72,58 @@ describe("contrôle Cloudflare Access", () => {
 
   it("laisse passer quand le contrôle est désactivé (développement local)", async () => {
     await expect(assertAccess(req(), { ...config, requireAccess: false }, finder)).resolves.toBeUndefined();
+  });
+});
+
+describe("clés Cloudflare Access (cache et rotation)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Cache simulé (caches.default) et fetch simulé de la liste de clés. */
+  function setup(cachedKids: string[] | null, cachedAgeMs: number, freshKids: string[]) {
+    const store = new Map<string, Response>();
+    if (cachedKids) {
+      store.set(`https://${team}/cdn-cgi/access/certs`, new Response(JSON.stringify({ keys: cachedKids.map((kid) => ({ kid, kty: "RSA" })) }), {
+        headers: { "x-memento-fetched-at": String(Date.now() - cachedAgeMs) },
+      }));
+    }
+    const fetches: string[] = [];
+    vi.stubGlobal("caches", {
+      default: {
+        match: (url: string) => Promise.resolve(store.get(url)?.clone()),
+        put: (url: string, res: Response) => { store.set(url, res); return Promise.resolve(); },
+      },
+    });
+    vi.stubGlobal("fetch", (url: string) => {
+      fetches.push(url);
+      return Promise.resolve(Response.json({ keys: freshKids.map((kid) => ({ kid, kty: "RSA" })) }));
+    });
+    return { fetches, store };
+  }
+
+  it("sert la clé depuis le cache sans appel réseau", async () => {
+    const { fetches } = setup(["k1"], 0, ["k1"]);
+    expect(await findKey(team, "k1")).toMatchObject({ kid: "k1" });
+    expect(fetches).toHaveLength(0);
+  });
+
+  it("relit la liste quand la clé est absente du cache (rotation), puis la garde en cache", async () => {
+    const { fetches } = setup(["ancienne"], 120_000, ["ancienne", "nouvelle"]);
+    expect(await findKey(team, "nouvelle")).toMatchObject({ kid: "nouvelle" });
+    expect(fetches).toHaveLength(1);
+    expect(await findKey(team, "nouvelle")).toMatchObject({ kid: "nouvelle" });
+    expect(fetches).toHaveLength(1);
+  });
+
+  it("ne relit pas la liste plus d'une fois par minute pour une clé inconnue", async () => {
+    const { fetches } = setup(["k1"], 5_000, ["k1"]);
+    expect(await findKey(team, "inconnue")).toBeUndefined();
+    expect(fetches).toHaveLength(0);
+  });
+
+  it("lit la liste à la source quand le cache est vide", async () => {
+    const { fetches, store } = setup(null, 0, ["k1"]);
+    expect(await findKey(team, "k1")).toMatchObject({ kid: "k1" });
+    expect(fetches).toHaveLength(1);
+    expect(store.size).toBe(1);
   });
 });

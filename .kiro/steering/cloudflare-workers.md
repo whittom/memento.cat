@@ -9,7 +9,7 @@ Source officielle : https://developers.cloudflare.com/workers/best-practices/wor
 ## Configuration
 - `compatibility_date` = date du jour à la création, mise à jour périodiquement ; activer `nodejs_compat`.
 - Ne jamais écrire `Env` à la main : `npx wrangler types` après tout ajout ou renommage de liaison.
-- Secrets via `wrangler secret put` ; en local, fichier `.env` listé dans `.gitignore`.
+- Secrets via `wrangler secret put` ; en local, fichier `.dev.vars` (modèle : `.dev.vars.example`) listé dans `.gitignore`. Ses valeurs remplacent celles de `vars` en local (vérifié le 2026-10-01 : `REQUIRE_ACCESS=false` y désactive bien le contrôle d'accès).
 - Environnements Wrangler : les liaisons ne sont pas héritées, les déclarer par environnement.
 
 ## Architecture
