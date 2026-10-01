@@ -43,6 +43,8 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 
 - [x] 3.12 Refonte visuelle « catalogue » : fiches numérotées, logo memento.cat avec tête de chat, icône d'onglet, thème sombre. _Exig. 4.1, 4.2, 4.8_
 
+- [x] 3.13 En-tête créateur et actions de consultation aussi avec le filtre « Créateur » ; nom du créateur cliquable sur chaque tuile. _Exig. 4.20, 4.21_
+
 ## Phase 4 — Vérification des suppressions → `v0.4`
 - [x] 4.1 `checkStates` Bluesky (`getPosts` par lot). _Exig. 5.1_
 - [x] 4.2 Endpoint de vérification par lot et boucle de progression dans la galerie. _Exig. 5.2, 5.3_

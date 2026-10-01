@@ -112,7 +112,7 @@ export function renderTile(post: Post, onOpen: (post: Post, index: number) => vo
       h(
         "p",
         { class: "tile-caption" },
-        h("span", { class: "tile-handle" }, post.creator.handle),
+        h("a", { class: "tile-handle", href: `/createur/${encodeURIComponent(post.creator.id)}`, "data-link": true, title: "Voir ce créateur" }, post.creator.handle),
         h(
           "span",
           { class: "tile-line" },
@@ -147,18 +147,19 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
   };
 
   // --- En-tête ---
-  if (creator) {
-    const unviewed = visibleCreators.find((c) => c.id === creator.id)?.unviewedCount ?? 0;
+  const headed = creator ?? visibleCreators.find((c) => c.id === filters.creator);
+  if (headed) {
+    const unviewed = visibleCreators.find((c) => c.id === headed.id)?.unviewedCount ?? 0;
     root.append(
       h(
         "section",
         { class: "creator-head" },
-        h("h1", {}, creator.displayName || creator.handle),
+        h("h1", {}, headed.displayName || headed.handle),
         h(
           "p",
           { class: "creator-meta" },
-          `${platformLabel(creator.platform)}, ${creator.handle}`,
-          creator.state === "paused" ? h("span", { class: "pill" }, "Synchronisation désactivée") : null,
+          `${platformLabel(headed.platform)}, ${headed.handle}`,
+          headed.state === "paused" ? h("span", { class: "pill" }, "Synchronisation désactivée") : null,
         ),
         h(
           "div",
@@ -170,7 +171,7 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
               class: "btn",
               disabled: unviewed === 0,
               onclick: async () => {
-                await api.setViewed("creator", creator.id, true);
+                await api.setViewed("creator", headed.id, true);
                 applyFilters({});
               },
             },
@@ -182,7 +183,7 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
               type: "button",
               class: "btn btn-quiet",
               onclick: async () => {
-                await api.setViewed("creator", creator.id, false);
+                await api.setViewed("creator", headed.id, false);
                 applyFilters({});
               },
             },
