@@ -22,6 +22,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 1. QUAND le déclencheur planifié s'exécute, LE SYSTÈME DOIT récupérer, pour chaque créateur actif, les publications postérieures au dernier curseur enregistré avec succès.
 2. LE SYSTÈME DOIT archiver pour chaque publication : identifiant, plateforme, créateur, date de publication, titre, texte, médias, description de chaque média, URL source, date de capture.
 3. LE SYSTÈME NE DOIT PAS archiver les commentaires ni les réponses.
+3c. LE SYSTÈME NE DOIT PAS archiver une publication sans média (image, vidéo ou GIF) : une publication texte seule est ignorée, et le curseur avance quand même pour ne pas la récupérer de nouveau. Un média trop volumineux pour être téléchargé compte comme média (exigence 3.3).
 3b. LE SYSTÈME NE DOIT archiver que les contributions originales du créateur : il NE DOIT PAS archiver les republications ni les citations d'une publication ou d'une ressource (flux, liste) d'un autre compte. Une citation de sa propre publication, ou une publication qui ajoute ses propres médias en citant un autre compte, reste une contribution originale.
 4. QUAND une publication déjà archivée est récupérée à nouveau, LE SYSTÈME NE DOIT PAS créer de doublon.
 5. SI la collecte d'un créateur échoue, ALORS LE SYSTÈME DOIT journaliser l'erreur, conserver le curseur précédent et poursuivre avec les autres créateurs.

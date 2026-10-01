@@ -43,7 +43,8 @@ export async function collectCreator(
   }
 
   for (const post of posts) {
-    if (await postExists(db, post.id)) {
+    // Une publication texte seule n'est pas archivée ; le curseur la dépasse pour ne plus la revoir.
+    if (post.media.length === 0 || (await postExists(db, post.id))) {
       await advanceCursor(db, creator.id, post.publishedAt);
       continue;
     }
