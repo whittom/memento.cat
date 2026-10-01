@@ -59,6 +59,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 9. QUAND l'utilisateur clique sur une miniature, LE SYSTÈME DOIT ouvrir la version complète du média dans une visionneuse (image en pleine résolution, vidéo lisible), sans quitter la page.
 10. PENDANT la visionneuse, LE SYSTÈME DOIT permettre de passer au média suivant ou précédent (flèches, clavier, balayage sur mobile) et de fermer (Échap, bouton, balayage vers le bas).
 11. SI aucune miniature n'a pu être archivée pour un média, ALORS LE SYSTÈME DOIT afficher une version réduite du média complet, chargée paresseusement.
+22. QUAND une image est affichée dans la visionneuse, LE SYSTÈME DOIT permettre de l'agrandir à sa pleine résolution (un pixel de l'image pour un pixel de l'écran), de la parcourir par glissement ou défilement, et de revenir à l'affichage ajusté, au bouton « loupe », au clic sur l'image ou au clavier (`+`, `-`, `Z`, Échap). Le passage à un autre média ramène à l'affichage ajusté. Les vidéos et GIF ne sont pas concernés.
 
 ### Médias consultés et non consultés
 12. QUAND l'utilisateur ouvre un média dans la visionneuse, LE SYSTÈME DOIT l'enregistrer comme consulté, avec la date de première consultation.
