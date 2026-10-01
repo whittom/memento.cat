@@ -44,6 +44,8 @@ export interface PostListRow extends PostRow {
   display_name: string | null;
   media_count: number;
   unviewed_count: number;
+  /** Numéro d'inventaire : rowid de posts, croissant à l'archivage (renuméroté par une reconstruction d'index). */
+  catalog_no: number;
 }
 
 export interface MediaRow {
@@ -252,7 +254,7 @@ export async function listPosts(db: D1Database, f: PostFilters): Promise<PostLis
 
   const { results } = await db
     .prepare(
-      `SELECT p.*, c.platform, c.handle, c.display_name,
+      `SELECT p.*, p.rowid AS catalog_no, c.platform, c.handle, c.display_name,
          (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id) AS media_count,
          (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND m.viewed_at IS NULL AND m.downloaded = 1) AS unviewed_count
        FROM posts p JOIN creators c ON c.id = p.creator_id
@@ -268,7 +270,7 @@ export async function listPosts(db: D1Database, f: PostFilters): Promise<PostLis
 export async function getVisiblePost(db: D1Database, id: string): Promise<PostListRow | null> {
   return db
     .prepare(
-      `SELECT p.*, c.platform, c.handle, c.display_name,
+      `SELECT p.*, p.rowid AS catalog_no, c.platform, c.handle, c.display_name,
          (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id) AS media_count,
          (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND m.viewed_at IS NULL AND m.downloaded = 1) AS unviewed_count
        FROM posts p JOIN creators c ON c.id = p.creator_id

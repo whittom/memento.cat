@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .head { fill: #1f1d1a; }
+    .eye { fill: #fbfaf7; }
+    @media (prefers-color-scheme: dark) {
+      .head { fill: #ece8e1; }
+      .eye { fill: #1e1c1a; }
+    }
+  </style>
+  <path class="head" d="M6.5 14 5.4 5.6l6.4 4.3c1.3-.4 2.7-.6 4.2-.6s2.9.2 4.2.6l6.4-4.3-1.1 8.4c.9 1.5 1.4 3.1 1.4 4.8 0 5.3-4.8 9.2-10.9 9.2S5.1 24.1 5.1 18.8c0-1.7.5-3.3 1.4-4.8Z"/>
+  <circle class="eye" cx="12" cy="18.5" r="1.6"/>
+  <circle class="eye" cx="20" cy="18.5" r="1.6"/>
+</svg>

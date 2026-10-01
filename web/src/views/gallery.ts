@@ -1,5 +1,5 @@
 import { api, ApiError } from "../api";
-import { fmtDate, h, platformLabel, plural, svgIcon } from "../dom";
+import { fmtCatalogNo, fmtDate, h, platformLabel, plural, svgIcon } from "../dom";
 import { navigate } from "../router";
 import type { Creator, Filters, Post } from "../types";
 
@@ -51,6 +51,7 @@ export function renderTile(post: Post, onOpen: (post: Post, index: number) => vo
 
   const state = post.mediaCount === 0 ? "text" : allViewed ? "viewed" : unviewed < post.media.length ? "partial" : "new";
   const label = [
+    `Fiche ${fmtCatalogNo(post.catalogNo)}`,
     post.creator.handle,
     fmtDate(post.publishedAt),
     isGroup ? plural(post.media.length, "élément", "éléments") : null,
@@ -89,26 +90,36 @@ export function renderTile(post: Post, onOpen: (post: Post, index: number) => vo
         ? h("span", { class: "mark mark-partial" }, plural(unviewed, "non vu", "non vus"))
         : null;
 
+  // La fiche : la vignette, puis le talon détachable (créateur, date, numéro d'inventaire).
   return h(
     "li",
     { class: `tile tile-${state}${isGroup ? " tile-group" : ""}`, "data-post-id": post.id },
     h(
-      "button",
-      {
-        type: "button",
-        class: "tile-button",
-        "aria-label": label,
-        onclick: () => onOpen(post, firstUnviewed(post)),
-      },
-      h("span", { class: "tile-frame" }, visual),
-      badges,
-      mark,
-    ),
-    h(
-      "p",
-      { class: "tile-caption" },
-      h("span", { class: "tile-handle" }, post.creator.handle),
-      h("time", { datetime: post.publishedAt }, fmtDate(post.publishedAt)),
+      "div",
+      { class: "tile-card" },
+      h(
+        "button",
+        {
+          type: "button",
+          class: "tile-button",
+          "aria-label": label,
+          onclick: () => onOpen(post, firstUnviewed(post)),
+        },
+        h("span", { class: "tile-frame" }, visual),
+        badges,
+        mark,
+      ),
+      h(
+        "p",
+        { class: "tile-caption" },
+        h("span", { class: "tile-handle" }, post.creator.handle),
+        h(
+          "span",
+          { class: "tile-line" },
+          h("time", { datetime: post.publishedAt }, fmtDate(post.publishedAt)),
+          h("span", { class: "catalog-no", "aria-hidden": "true" }, fmtCatalogNo(post.catalogNo)),
+        ),
+      ),
     ),
   );
 }

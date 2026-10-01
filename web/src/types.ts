@@ -33,6 +33,8 @@ export interface Media {
 
 export interface Post {
   id: string;
+  /** Numéro d'inventaire du catalogue. */
+  catalogNo: number;
   creator: { id: string; handle: string; displayName: string | null; platform: Platform };
   publishedAt: string;
   capturedAt: string;

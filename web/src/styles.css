@@ -1,29 +1,55 @@
 /*
-  memento : une planche contact posée sur une table lumineuse.
-  Les médias non consultés sont entourés au crayon gras rouge, comme on marque une image à revoir.
-  Tout le reste reste neutre : une seule couleur d'accent, réservée à ce marquage.
+  memento.cat : un catalogue de souvenirs, avec un chat en clin d'œil discret.
+  Chaque publication est une fiche numérotée ; les médias non consultés sont entourés au crayon gras
+  rouge, comme on marque une image à revoir. Une seule couleur d'accent, réservée à ce marquage.
+  Deux thèmes : papier crème le jour, chambre noire la nuit (selon la préférence du système).
 */
 
 :root {
-  --table: #e6eaec;      /* table lumineuse */
-  --sheet: #fafbfb;      /* papier de la planche */
-  --graphite: #23282d;   /* texte, cadres */
-  --pencil: #515a62;     /* texte secondaire */
-  --rule: #c9d0d4;       /* filets */
+  --table: #f1efea;      /* fond : papier crème */
+  --sheet: #fbfaf7;      /* fiche */
+  --sheet-hover: #ffffff;
+  --well: #e9e6df;       /* fond d'une vignette en attente */
+  --graphite: #1f1d1a;   /* encre : texte, cadres */
+  --ink-strong: #000000; /* survol d'un bouton principal */
+  --pencil: #5c5852;     /* texte secondaire */
+  --rule: #d9d5cc;       /* filets */
   --crayon: #c0262d;     /* crayon gras : non consulté */
   --amber: #8a5210;      /* supprimé par l'auteur */
-  --loupe: #1d2226;      /* fond de la visionneuse */
+  --loupe: #141312;      /* fond de la visionneuse, sombre dans les deux thèmes */
+  --on-loupe: #f4f1ec;   /* texte de la visionneuse */
+  --bar-bg: rgb(241 239 234 / 0.88);
 
   --font: "Archivo", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius-card: 12px;
   --step--1: 0.8125rem;
   --step-0: 1rem;
   --step-1: 1.25rem;
   --step-2: 1.625rem;
   --step-3: 2.125rem;
   --space: 1rem;
-  --radius: 3px;
+  --radius: 6px;
 
-  color-scheme: light;
+  color-scheme: light dark;
+}
+
+/* Chambre noire : mêmes rôles, valeurs inversées ; contraste AA conservé. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --table: #141312;
+    --sheet: #1e1c1a;
+    --sheet-hover: #262421;
+    --well: #2a2825;
+    --graphite: #ece8e1;
+    --ink-strong: #ffffff;
+    --pencil: #aaa49b;
+    --rule: #3a3733;
+    --crayon: #ff6b6b;
+    --amber: #e0a55a;
+    --loupe: #0d0c0b;
+    --bar-bg: rgb(20 19 18 / 0.88);
+  }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -65,14 +91,29 @@ h3 { font-size: var(--step-0); }
 /* ---------- Barre ---------- */
 
 .bar {
-  display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
   padding: max(0.75rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left));
   border-bottom: 1px solid var(--rule);
+  background: var(--bar-bg);
+  -webkit-backdrop-filter: saturate(1.2) blur(10px); backdrop-filter: saturate(1.2) blur(10px);
 }
 .wordmark {
-  font-stretch: 125%; font-weight: 800; font-size: var(--step-2);
-  letter-spacing: -0.02em; text-decoration: none;
+  display: inline-flex; align-items: baseline; text-decoration: none;
+  font-stretch: 125%; font-weight: 800; font-size: var(--step-2); letter-spacing: -0.02em; line-height: 1;
 }
+.wordmark-tld {
+  font-family: var(--mono); font-stretch: 100%; font-weight: 400; font-size: 0.6em;
+  letter-spacing: 0; color: var(--pencil); margin-left: 0.05em;
+}
+/* Le chat : une seule apparition, discrète, à côté du nom de domaine. */
+.wordmark-cat {
+  width: 0.72em; height: 0.72em; margin-left: 0.3em; align-self: center;
+  fill: none; stroke: var(--pencil); stroke-width: 2.2; stroke-linejoin: round;
+  transition: transform 180ms ease-out;
+}
+.wordmark-cat circle { fill: var(--pencil); stroke: none; }
+.wordmark:hover .wordmark-cat { transform: rotate(-8deg) translateY(-1px); }
 .bar-nav { display: flex; gap: 1.25rem; }
 .bar-nav a { text-decoration: none; color: var(--pencil); padding-block: 0.25rem; }
 .bar-nav a[aria-current="page"] { color: var(--graphite); box-shadow: inset 0 -2px 0 var(--graphite); }
@@ -89,10 +130,10 @@ main:focus { outline: none; }
   border: 1.5px solid var(--graphite); border-radius: var(--radius);
   background: var(--sheet); color: var(--graphite); cursor: pointer; text-decoration: none;
 }
-.btn:hover:not(:disabled) { background: #fff; }
+.btn:hover:not(:disabled) { background: var(--sheet-hover); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-primary { background: var(--graphite); color: var(--sheet); }
-.btn-primary:hover:not(:disabled) { background: #000; }
+.btn-primary:hover:not(:disabled) { background: var(--ink-strong); }
 .btn-quiet { border-color: var(--rule); }
 .btn-danger { color: var(--crayon); border-color: currentColor; }
 
@@ -138,42 +179,52 @@ main:focus { outline: none; }
 @media (min-width: 64rem) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem 1rem; } }
 @media (min-width: 96rem) { .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 
-.tile { position: relative; min-width: 0; }
+/* La fiche : une carte arrondie, la vignette en haut, le talon détachable en bas. */
+.tile { position: relative; min-width: 0; isolation: isolate; }
+
+.tile-card {
+  position: relative; z-index: 2; height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-card);
+  overflow: hidden;
+  transition: transform 160ms ease-out, border-color 160ms ease-out;
+}
+.tile:hover .tile-card { transform: translateY(-2px); border-color: var(--pencil); }
 
 .tile-button {
   position: relative; display: block; width: 100%;
   padding: 0; border: 0; background: none; cursor: zoom-in; color: inherit; font: inherit; text-align: left;
-  isolation: isolate;
 }
+.tile-button:focus-visible { outline-offset: -3px; border-radius: var(--radius-card) var(--radius-card) 0 0; }
 
 .tile-frame {
-  position: relative; z-index: 1; display: grid; place-items: center;
-  aspect-ratio: 1; overflow: hidden;
-  background: var(--sheet); border: 6px solid var(--sheet); outline: 1px solid var(--rule);
+  position: relative; display: grid; place-items: center;
+  aspect-ratio: 1; overflow: hidden; background: var(--well);
 }
 .tile-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* Groupe : les tirages suivants dépassent derrière le premier. */
-.tile-group .tile-button::before,
-.tile-group .tile-button::after {
+/* Groupe : les fiches suivantes dépassent derrière la première. */
+.tile-group::before,
+.tile-group::after {
   content: ""; position: absolute; inset: 0;
-  background: var(--sheet); outline: 1px solid var(--rule);
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-card);
 }
-.tile-group .tile-button::before { transform: translate(5px, -5px); z-index: 0; }
-.tile-group .tile-button::after { transform: translate(10px, -10px); z-index: -1; }
+.tile-group::before { transform: translate(5px, -5px); z-index: 1; }
+.tile-group::after { transform: translate(10px, -10px); z-index: 0; }
 .tile-group { margin: 10px 10px 0 0; }
 
+.tile-frame:has(.tile-text) { background: var(--sheet); }
 .tile-text {
-  padding: 0.75rem; font-size: var(--step--1); line-height: 1.45;
+  padding: 0.85rem; font-size: var(--step--1); line-height: 1.45;
   display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden;
   align-self: start;
 }
 .tile-missing { padding: 0.75rem; font-size: var(--step--1); color: var(--pencil); text-align: center; }
 
-.tile-badges { position: absolute; z-index: 2; right: 10px; bottom: 10px; display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+.tile-badges { position: absolute; z-index: 2; right: 8px; bottom: 8px; display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
 .badge {
   display: inline-flex; align-items: center; gap: 0.25rem;
-  padding: 0.15rem 0.45rem; border-radius: var(--radius);
+  padding: 0.15rem 0.55rem; border-radius: 999px;
   font-size: 0.75rem; font-weight: 700; line-height: 1.4;
   background: var(--graphite); color: var(--sheet);
 }
@@ -183,7 +234,7 @@ main:focus { outline: none; }
 
 /* Le crayon gras : un cercle tracé à la main autour du mot. */
 .mark {
-  position: absolute; z-index: 2; left: 2px; top: 2px;
+  position: absolute; z-index: 2; left: 8px; top: 8px;
   padding: 0.1rem 0.55rem 0.15rem;
   font-size: var(--step--1); font-weight: 800; font-stretch: 100%;
   color: var(--crayon); background: var(--sheet);
@@ -196,12 +247,21 @@ main:focus { outline: none; }
 .tile-viewed .tile-frame img { opacity: 0.7; filter: saturate(0.5); }
 .tile-viewed .tile-caption { color: var(--pencil); }
 
+/* Le talon : séparé de la vignette par un pointillé, comme une fiche à détacher. */
 .tile-caption {
-  margin: 0.5rem 0 0; display: flex; justify-content: space-between; gap: 0.5rem;
+  margin: 0; padding: 0.55rem 0.75rem 0.65rem;
+  display: grid; gap: 0.15rem;
+  border-top: 1px dashed var(--rule);
   font-size: var(--step--1); line-height: 1.3;
 }
 .tile-handle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.tile-caption time { color: var(--pencil); flex: none; }
+.tile-line { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; color: var(--pencil); }
+.tile-line time { flex: none; }
+
+.catalog-no {
+  font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.02em;
+  color: var(--pencil); white-space: nowrap;
+}
 
 .status { color: var(--pencil); margin: 2rem 0; max-width: 60ch; }
 .more { display: flex; margin: 2rem auto; }
@@ -216,8 +276,8 @@ main:focus { outline: none; }
 
 /* ---------- Gestion des créateurs ---------- */
 
-.panel { background: var(--sheet); outline: 1px solid var(--rule); padding: 1.25rem; margin-bottom: 1.5rem; max-width: 64rem; }
-.panel-warning { outline: 2px solid var(--crayon); }
+.panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-card); padding: 1.25rem; margin-bottom: 1.5rem; max-width: 64rem; }
+.panel-warning { border: 2px solid var(--crayon); }
 .add-fields { display: grid; gap: 0.75rem; align-items: end; grid-template-columns: 1fr; }
 @media (min-width: 40rem) { .add-fields { grid-template-columns: 10rem 1fr auto; } }
 .form-error { color: var(--crayon); margin: 0.5rem 0 0; min-height: 1.5em; }
@@ -243,9 +303,10 @@ main:focus { outline: none; }
 .dialog {
   border: 0; padding: 1.5rem; width: min(34rem, calc(100vw - 2rem));
   background: var(--sheet); color: var(--graphite);
-  outline: 1px solid var(--rule); box-shadow: 0 1.5rem 3rem rgb(29 34 38 / 0.25);
+  border: 1px solid var(--rule); border-radius: var(--radius-card);
+  box-shadow: 0 1.5rem 3rem rgb(0 0 0 / 0.25);
 }
-.dialog::backdrop { background: rgb(29 34 38 / 0.5); }
+.dialog::backdrop { background: rgb(20 19 18 / 0.55); }
 .choice { padding: 1rem 0; border-top: 1px solid var(--rule); display: grid; gap: 0.6rem; justify-items: start; }
 .choice p { margin: 0; }
 .choice-danger h3 { color: var(--crayon); }
@@ -257,19 +318,19 @@ main:focus { outline: none; }
 .viewer {
   position: fixed; inset: 0; z-index: 40;
   display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto;
-  background: var(--loupe); color: var(--sheet);
+  background: var(--loupe); color: var(--on-loupe);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-.viewer :focus-visible { outline-color: var(--sheet); }
+.viewer :focus-visible { outline-color: var(--on-loupe); }
 
 .viewer-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.5rem 0.5rem 0.5rem 1rem; }
 .viewer-position { margin: 0; display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: var(--step--1); color: #c7ced3; }
-.viewer-handle { color: var(--sheet); font-weight: 700; }
-.viewer-count { font-weight: 800; color: var(--sheet); }
+.viewer-handle { color: var(--on-loupe); font-weight: 700; }
+.viewer-count { font-weight: 800; color: var(--on-loupe); }
 
 .viewer-close, .viewer-nav {
   display: grid; place-items: center; width: 2.75rem; height: 2.75rem;
-  background: transparent; color: var(--sheet); border: 0; border-radius: 50%; cursor: pointer;
+  background: transparent; color: var(--on-loupe); border: 0; border-radius: 50%; cursor: pointer;
 }
 .viewer-close:hover, .viewer-nav:hover:not(:disabled) { background: rgb(255 255 255 / 0.1); }
 .viewer-nav:disabled { opacity: 0.25; cursor: default; }
@@ -293,14 +354,14 @@ main:focus { outline: none; }
 }
 .strip-item {
   position: relative; width: 3.5rem; height: 3.5rem; padding: 0; border: 2px solid transparent;
-  background: #2c3237; color: var(--sheet); cursor: pointer; overflow: hidden; flex: none;
+  background: #2c3237; color: var(--on-loupe); cursor: pointer; overflow: hidden; flex: none;
 }
 .strip-item img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.6; }
-.strip-item.is-current { border-color: var(--sheet); }
+.strip-item.is-current { border-color: var(--on-loupe); }
 .strip-item.is-current img { opacity: 1; }
 .strip-item.is-new::after {
   content: ""; position: absolute; top: 3px; left: 3px; width: 0.6rem; height: 0.6rem;
-  border-radius: 50%; background: var(--sheet); border: 2.5px solid var(--crayon);
+  border-radius: 50%; background: var(--on-loupe); border: 2.5px solid var(--crayon);
 }
 
 .viewer-details { background: #262c31; max-height: 40dvh; overflow-y: auto; }
@@ -316,7 +377,7 @@ main:focus { outline: none; }
 .viewer-source { display: inline-flex; align-items: center; gap: 0.35rem; }
 .notice-deleted { color: #f0c38a; }
 .viewer-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.viewer-actions .btn { background: transparent; color: var(--sheet); border-color: #5b646b; }
+.viewer-actions .btn { background: transparent; color: var(--on-loupe); border-color: #5b646b; }
 
 /* ---------- Message éphémère ---------- */
 
@@ -330,5 +391,6 @@ main:focus { outline: none; }
 #toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform 160ms ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
-  #toast { transition: none; }
+  #toast, .tile-card, .wordmark-cat { transition: none; }
+  .tile:hover .tile-card, .wordmark:hover .wordmark-cat { transform: none; }
 }

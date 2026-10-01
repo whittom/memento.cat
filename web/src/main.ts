@@ -88,7 +88,7 @@ async function showGallery(route: Extract<Route, { name: "gallery" | "creator" }
     onOpen: (post, index, s) => openFromGallery(post, index, s),
   });
   gallery = state;
-  document.title = creator ? `${creator.handle}, memento` : "memento";
+  document.title = creator ? `${creator.handle}, memento.cat` : "memento.cat";
   return state;
 }
 
@@ -130,7 +130,7 @@ async function render(): Promise<void> {
   if (route.name === "creators") {
     galleryKey = null;
     gallery = null;
-    document.title = "Créateurs, memento";
+    document.title = "Créateurs, memento.cat";
     await renderCreators(main);
     return;
   }

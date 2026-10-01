@@ -1,5 +1,5 @@
 import { api } from "../api";
-import { fmtDate, fmtDateTime, h, platformLabel, setChildren, svgIcon, toast } from "../dom";
+import { fmtCatalogNo, fmtDate, fmtDateTime, h, platformLabel, setChildren, svgIcon, toast } from "../dom";
 import type { Media, Post } from "../types";
 import { markViewed } from "../views-queue";
 
@@ -114,6 +114,8 @@ export function openViewer(opts: ViewerOptions): Viewer {
       h(
         "dl",
         { class: "viewer-meta" },
+        h("dt", {}, "Fiche"),
+        h("dd", { class: "catalog-no" }, fmtCatalogNo(post.catalogNo)),
         h("dt", {}, "Créateur"),
         h("dd", {}, `${post.creator.handle} (${platformLabel(post.creator.platform)})`),
         h("dt", {}, "Publiée"),
