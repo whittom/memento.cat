@@ -81,8 +81,6 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 4. QUAND une publication Bluesky n'est plus disponible, LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, et conserver la copie archivée, sous réserve de Q2.
 5. QUAND une publication Reddit n'est plus disponible, LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, comme pour Bluesky.
 
-> Décision du 2026-09-28 : usage strictement personnel, pas de purge en v1. Écart connu : les conditions de l'API Reddit exigent la suppression des contenus supprimés, quel que soit l'usage. La purge (ancienne exigence 5.5–5.6) est reportée et pourra être réactivée si l'approbation Reddit l'exige.
-
 ## Exigence 6 — Conformité aux plateformes
 1. LE SYSTÈME DOIT n'utiliser que les API officielles des plateformes.
 2. LE SYSTÈME DOIT s'authentifier auprès de Reddit par OAuth et envoyer un User-Agent conforme au format imposé.
