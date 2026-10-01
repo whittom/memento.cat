@@ -368,15 +368,17 @@ export function openViewer(opts: ViewerOptions): Viewer {
 
   stage.addEventListener("pointerdown", (e) => {
     if (!zoomed || e.pointerType !== "mouse" || e.button !== 0) return;
+    // Pas de capture du pointeur ici : elle redirigerait le clic vers la zone et non vers l'image.
     drag = { x: e.clientX, y: e.clientY, left: stage.scrollLeft, top: stage.scrollTop, moved: false };
-    stage.setPointerCapture(e.pointerId);
   });
   stage.addEventListener("pointermove", (e) => {
     if (!drag) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
+      // Le glissement commence vraiment : on capture le pointeur pour le suivre hors de la zone.
       drag.moved = true;
+      stage.setPointerCapture(e.pointerId);
       stage.classList.add("is-dragging");
     }
     if (drag.moved) {
@@ -395,7 +397,10 @@ export function openViewer(opts: ViewerOptions): Viewer {
   stage.addEventListener("pointerup", endDrag);
   stage.addEventListener("pointercancel", endDrag);
   stage.addEventListener("click", (e) => {
-    if (ignoreClick || !(e.target instanceof HTMLImageElement)) return;
+    if (ignoreClick) return;
+    // Agrandie, l'image peut être plus petite que la zone : un clic dans la marge revient aussi à l'affichage ajusté.
+    const onImage = e.target instanceof HTMLImageElement;
+    if (!onImage && !(zoomed && e.target === stage)) return;
     setZoom(!zoomed, { x: e.clientX, y: e.clientY });
   });
 
