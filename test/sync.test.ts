@@ -72,6 +72,13 @@ describe("collecte d'un créateur", () => {
     expect(writes.at(-1)?.sql).toContain("last_success_at");
   });
 
+  it("ignore les publications sans média, sans les archiver, et fait quand même avancer le curseur", async () => {
+    const { db, writes } = fakeDb();
+    const r = await collectCreator(env(db), db, new Budget(45, 40), config, connector({ posts: [post(1)], reachedCursor: true }), creator("active"), "2026-09-30T00:00:00.000Z");
+    expect(r.archived).toBe(0);
+    expect(writes.filter((w) => w.sql.includes("SET cursor")).map((w) => w.args[0])).toEqual(["2026-09-01T12:00:00.000Z"]);
+  });
+
   it("signale un curseur non rejoint pour que la galerie relance", async () => {
     const { db } = fakeDb();
     const r = await collectCreator(env(db), db, new Budget(45, 40), config, connector({ posts: [], reachedCursor: false }), creator("active", "2026-08-01T00:00:00.000Z"), "2026-09-30T00:00:00.000Z");
@@ -81,7 +88,8 @@ describe("collecte d'un créateur", () => {
   it("s'arrête proprement quand le budget ne suffit plus, sans avancer le curseur au-delà", async () => {
     const { db, writes } = fakeDb({ existing: ["bluesky:p1"] });
     const tally = { archived: 0 };
-    const run = collectCreator(env(db), db, new Budget(45, 0), config, connector({ posts: [post(1), post(2)], reachedCursor: true }), creator("active"), "2026-09-30T00:00:00.000Z", tally);
+    const withImage = { ...post(2), media: [{ kind: "image" as const, sourceUrl: "https://cdn/f", thumbUrl: null, width: null, height: null, thumbWidth: null, thumbHeight: null, description: null }] };
+    const run = collectCreator(env(db), db, new Budget(45, 0), config, connector({ posts: [post(1), withImage], reachedCursor: true }), creator("active"), "2026-09-30T00:00:00.000Z", tally);
     await expect(run).rejects.toBeInstanceOf(BudgetExhaustedError);
     expect(tally.archived).toBe(0);
     expect(writes.filter((w) => w.sql.includes("SET cursor")).map((w) => w.args[0])).toEqual(["2026-09-01T12:00:00.000Z"]);

@@ -1,7 +1,7 @@
 /*
   memento.cat : un catalogue de souvenirs, avec un chat en clin d'œil discret.
-  Chaque publication est une fiche numérotée ; les médias non consultés sont entourés au crayon gras
-  rouge, comme on marque une image à revoir. Une seule couleur d'accent, réservée à ce marquage.
+  Chaque publication est une fiche numérotée ; les médias non consultés portent une pastille discrète
+  (point rouge et mot). Une seule couleur d'accent, réservée à ce marquage.
   Deux thèmes : papier crème le jour, chambre noire la nuit (selon la préférence du système).
 */
 
@@ -232,17 +232,23 @@ main:focus { outline: none; }
 .icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .badge-kind .icon { fill: currentColor; stroke: none; }
 
-/* Le crayon gras : un cercle tracé à la main autour du mot. */
+/* Non consulté : une pastille discrète, un point rouge suivi d'un mot (jamais la couleur seule). */
 .mark {
   position: absolute; z-index: 2; left: 8px; top: 8px;
-  padding: 0.1rem 0.55rem 0.15rem;
-  font-size: var(--step--1); font-weight: 800; font-stretch: 100%;
-  color: var(--crayon); background: var(--sheet);
-  border: 2.5px solid var(--crayon); border-radius: 55% 45% 50% 48% / 60% 52% 48% 40%;
-  transform: rotate(-4deg);
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.12rem 0.5rem 0.12rem 0.4rem;
+  font-size: 0.72rem; font-weight: 600; line-height: 1.4; font-stretch: 100%;
+  color: var(--graphite); background: var(--sheet);
+  border: 1px solid var(--rule); border-radius: 999px;
 }
-.mark-partial { border-style: dashed; }
-.mark-inline { position: static; display: inline-block; transform: rotate(-2deg); }
+.mark::before {
+  content: ""; flex: none; width: 0.45rem; height: 0.45rem; border-radius: 50%;
+  background: var(--crayon);
+}
+/* Partiellement consulté : point évidé. */
+.mark-partial::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--crayon); }
+/* Dans le texte (page des créateurs) : seulement le point et le compte, sans cadre. */
+.mark-inline { position: static; padding: 0; border: 0; background: none; font-size: inherit; }
 
 .tile-viewed .tile-frame img { opacity: 0.7; filter: saturate(0.5); }
 .tile-viewed .tile-caption { color: var(--pencil); }
