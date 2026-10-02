@@ -184,6 +184,8 @@ Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `dele
 | POST | `/api/admin/reindex` | reconstruction de l'index D1 depuis les `post.json`, par lots (corps : `{ "cursor" }`) |
 
 ## Galerie
+**Calme par conception** (intention anti-doomscrolling, voir `requirements.md` et `product.md`) : la galerie n'affiche que les créateurs suivis, du plus récent au plus ancien ; aucun compteur d'engagement n'est archivé ni affiché (le modèle `NormalizedPost` n'en a pas) ; aucune vidéo ne démarre seule (contrôles visibles, `preload="metadata"` ; seuls les GIF tournent en boucle, à l'ouverture dans la visionneuse) ; aucune notification, aucun service worker ; la ligne d'arrivée est l'état « non consulté » des médias, le filtre « Non consultés seulement » et les actions « Tout marquer consulté ». Point à revoir : le chargement automatique de la page suivante au défilement (Q6).
+
 SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtrable, fiche publication, gestion des créateurs (ajout, bouton « Synchroniser maintenant », désactiver/réactiver, supprimer avec choix logique ou physique, corbeille avec restauration), fiche créateur (avec bouton « Vérifier les suppressions »). Deux adresses mènent à la galerie d'un créateur : `/createur/:id` et `/?creator=<id>` (filtre « Créateur ») ; les deux affichent le même en-tête (nom, plateforme, identifiant, actions de consultation). Le nom du créateur sur chaque tuile est un lien vers sa page. La suppression physique demande de retaper le nom du créateur. Mise en page conçue d'abord pour le mobile ; grille de 2, 3, 4 puis 5 colonnes aux points de rupture de 640, 1024 et 1536 px.
 
 ## Configuration et secrets

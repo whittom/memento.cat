@@ -47,6 +47,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 
 - [x] 3.14 Loupe dans la visionneuse : pleine résolution, déplacement, raccourcis clavier. _Exig. 4.22_
 
+- [ ] 3.17 Évaluer le remplacement du chargement automatique au défilement par le seul bouton « Afficher plus » (question ouverte Q6, intention anti-doomscrolling).
 - [x] 3.16 Filtre « Non consultés seulement » : bouton à bascule à la place de la case à cocher. _Exig. 4.15_
 - [x] 3.15 Fermeture de la visionneuse par un clic en dehors de l'image (marges d'ajustement comprises). _Exig. 4.23_
 

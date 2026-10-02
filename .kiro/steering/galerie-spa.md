@@ -14,7 +14,8 @@ Règles du projet (pas de guide officiel unique pour ce domaine).
 - Accessibilité : texte alternatif archivé réutilisé comme `alt`, navigation au clavier, contraste AA.
 - La SPA ne parle qu'à `/api/*` ; aucun appel direct à une plateforme.
 - Politique de sécurité du contenu (CSP) stricte : aucun script ni style en ligne (pas de `<script>` sans `src`, pas d'attribut `style` ni `on*` dans le HTML, pas de `innerHTML`), aucune ressource externe autre que Google Fonts. Ajouter une origine externe exige de modifier `src/security.ts` et la spec.
-- Pagination par curseur (défilement infini ou bouton « Plus »).
+- Pagination par curseur. Aujourd'hui la page suivante se charge automatiquement en approchant du bas (marge de 800 px) et un bouton « Afficher plus » existe aussi ; ce défilement continu contrarie l'intention anti-doomscrolling (question ouverte Q6).
+- Calme : pas de compteur d'engagement, pas de lecture automatique de vidéo, pas de notification, pas d'animation qui réclame l'attention ; les seuls éléments rouges signalent les médias non consultés.
 - Miniatures d'abord : la grille ne charge jamais la version complète d'un média, sauf en l'absence de miniature.
 - Indicateur « non consulté » : pastille avec texte ou icône, jamais la couleur seule.
 - Filtre « Non consultés seulement » : un bouton à bascule (`aria-pressed`), plein et précédé d'une coche quand il est actif, et non une case à cocher.
