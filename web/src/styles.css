@@ -136,6 +136,10 @@ main:focus { outline: none; }
 .btn-primary:hover:not(:disabled) { background: var(--ink-strong); }
 .btn-quiet { border-color: var(--rule); }
 .btn-danger { color: var(--crayon); border-color: currentColor; }
+/* Bouton à bascule : actif, fond plein et coche (l'état ne repose pas sur la couleur seule). */
+.btn-toggle[aria-pressed="true"] { background: var(--graphite); color: var(--sheet); }
+.btn-toggle[aria-pressed="true"]:hover:not(:disabled) { background: var(--ink-strong); }
+.btn-toggle[aria-pressed="true"]::before { content: "\2713"; font-weight: 800; }
 
 .field { display: grid; gap: 0.25rem; font-size: var(--step--1); color: var(--pencil); }
 .field input, .field select {
@@ -144,8 +148,6 @@ main:focus { outline: none; }
   border: 1.5px solid var(--rule); border-radius: var(--radius); background: var(--sheet);
 }
 .field input:focus, .field select:focus { border-color: var(--graphite); outline: none; box-shadow: 0 0 0 2px var(--graphite); }
-.check { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; font-size: var(--step--1); }
-.check input { width: 1.15rem; height: 1.15rem; accent-color: var(--graphite); }
 
 /* ---------- Filtres ---------- */
 
@@ -158,13 +160,13 @@ main:focus { outline: none; }
   display: grid; gap: 0.75rem; align-items: end; padding-top: 0.25rem;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
 }
-.filter-fields .check { grid-column: 1 / -1; }
+.filter-fields .btn-toggle { grid-column: 1 / -1; justify-content: center; }
 @media (min-width: 64rem) {
   .filters { grid-template-columns: minmax(12rem, 18rem) 1fr; align-items: start; }
   .filter-more summary { display: none; }
   .filter-fields { display: flex; flex-wrap: wrap; padding-top: 0; }
   .filter-fields .field { flex: 1 1 7.5rem; }
-  .filter-fields .check { flex: 0 0 auto; white-space: nowrap; }
+  .filter-fields .btn-toggle { flex: 0 0 auto; white-space: nowrap; }
 }
 .field select { width: 100%; }
 

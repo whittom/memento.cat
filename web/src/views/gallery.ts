@@ -260,11 +260,16 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
         h("option", { value: "deleted", selected: filters.status === "deleted" }, "Supprimées par l'auteur"),
       ),
     ),
+    // Bouton à bascule : son état est annoncé (aria-pressed) et se voit aussi par la coche et le fond plein.
     h(
-      "label",
-      { class: "check" },
-      h("input", { type: "checkbox", checked: Boolean(filters.unviewed), onchange: (e: Event) => applyFilters({ unviewed: (e.target as HTMLInputElement).checked }) }),
-      h("span", {}, "Non consultés seulement"),
+      "button",
+      {
+        type: "button",
+        class: `btn btn-toggle${filters.unviewed ? " is-on" : ""}`,
+        "aria-pressed": String(Boolean(filters.unviewed)),
+        onclick: () => applyFilters({ unviewed: !filters.unviewed }),
+      },
+      "Non consultés seulement",
     ),
     )),
   );

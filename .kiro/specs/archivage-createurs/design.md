@@ -134,6 +134,7 @@ Sur Workers Paid, relever `MAX_SUBREQUESTS_PER_RUN` et `MAX_QUERIES_PER_RUN`.
 - État par média : `viewed_at` (un seul utilisateur, donc pas de table par utilisateur).
 - État dérivé par publication : `aucun`, `partiel` ou `complet`, calculé à la requête (`COUNT` des médias non consultés).
 - Marquage automatique à l'ouverture dans la visionneuse (`POST /api/views`, portée `media`), envoyé sans bloquer l'affichage ; en cas d'échec réseau, l'état local est conservé et renvoyé au prochain chargement.
+- Le filtre « non consultés » de la liste est un bouton à bascule (`aria-pressed`) : actif, il est plein et précédé d'une coche, et l'adresse porte `unviewed=1`.
 - Marquage manuel en masse : `POST /api/views` avec `{ "scope": "media" | "post" | "creator", "id": "...", "viewed": true | false }`.
 
 ## Cycle de vie d'un créateur
