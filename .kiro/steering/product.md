@@ -20,5 +20,5 @@ Instagram, Facebook, Threads, X ; publication ou interaction ; comptes privés ;
 
 ## Principes
 - Canaux officiels uniquement, quotas respectés.
-- Pas de purge des contenus supprimés en v1 (usage personnel) ; écart connu avec les conditions Reddit, documenté dans la spec.
+- Contenus supprimés à la source : Bluesky et Mastodon gardent la copie avec le statut « supprimé » (usage personnel, questions Q2 et Q5) ; Reddit les efface définitivement, comme l'exigent les conditions de son API.
 - L'archive n'est jamais publique.

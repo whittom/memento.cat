@@ -101,7 +101,7 @@ R2 offre 10 Go gratuits : les vidéos les consomment vite. `MAX_MEDIA_BYTES` (10
 - Les vidéos Reddit sont archivées sans le son (Reddit sert la piste audio séparément).
 - Au premier passage, seule la page la plus récente de chaque créateur est archivée ; l'historique plus ancien n'est pas rapatrié, ni par la collecte planifiée ni par la synchronisation manuelle.
 - Une publication Bluesky antidatée (date de création antérieure au curseur) peut être ignorée.
-- Pas de purge automatique des contenus supprimés par leurs auteurs (décision de projet). Voir l'écart documenté avec les conditions de Reddit dans la spec, et la question Q5 pour Mastodon.
+- Contenus supprimés à la source : Bluesky et Mastodon gardent la copie, avec le statut « supprimé » (usage personnel ; questions Q2 et Q5 de la spec). Reddit : la publication est effacée définitivement (fichiers et index) quand la vérification des suppressions la constate. Cette vérification reste à la demande : lancez-la régulièrement sur vos créateurs Reddit, car Reddit recommande de supprimer les contenus retirés sous 48 heures.
 - Quand un serveur Mastodon signale son quota atteint, la collecte suspend tous les créateurs Mastodon jusqu'au passage suivant, même ceux d'autres serveurs.
 - Les publications qui ne contiennent que du texte ne sont pas archivées, quelle que soit la plateforme (exigence 2.3c).
 

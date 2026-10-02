@@ -34,7 +34,7 @@ export const api = {
     request<{ remaining: number; done: boolean }>(`/creators/${enc(id)}/purge`, post({ confirm })),
   sync: (id: string) => request<{ archived: number; done: boolean }>(`/creators/${enc(id)}/sync`, post({})),
   verify: (id: string, startedAt: string | null) =>
-    request<{ startedAt: string; processed: number; deleted: number; remaining: number }>(
+    request<{ startedAt: string; processed: number; deleted: number; purged: number; remaining: number }>(
       `/creators/${enc(id)}/verify`,
       post({ startedAt }),
     ),

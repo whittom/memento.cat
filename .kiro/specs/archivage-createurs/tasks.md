@@ -6,7 +6,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 0.1 Pousser le dépôt Git sur GitHub (dépôt privé `whittom/memento.cat`).
 - [x] 0.2 Créer le compte Cloudflare, le bucket R2 `memento-media` et la base D1 `memento-db`.
 - [ ] 0.3 Déposer la demande d'accès à l'API Reddit (délai inconnu : à lancer dès maintenant). Brouillon prêt dans `docs/reddit-access-request.md`, non envoyé. _Exig. 6.4_
-- [x] 0.4 Trancher Q1 : Reddit conservé, sans purge en v1.
+- [x] 0.4 Trancher Q1 : Reddit conservé, sans purge en v1 (décision remplacée le 2026-10-01 : voir 4.4).
 - [x] 0.5 Ajouter `.gitignore` (`wrangler.jsonc`, `.dev.vars`, `.env`, `node_modules`, `dist`) et `wrangler.example.jsonc`. _Exig. 8.2_
 
 ## Phase 1 — Socle technique → `v0.1`
@@ -52,7 +52,8 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 ## Phase 4 — Vérification des suppressions → `v0.4`
 - [x] 4.1 `checkStates` Bluesky (`getPosts` par lot). _Exig. 5.1_
 - [x] 4.2 Endpoint de vérification par lot et boucle de progression dans la galerie. _Exig. 5.2, 5.3_
-- [x] 4.3 Statut « supprimé » et badge (ou purge, selon Q2). _Exig. 4.6, 5.4_
+- [x] 4.3 Statut « supprimé » et badge (Bluesky, Mastodon). _Exig. 4.6, 5.4, 5.6_
+- [x] 4.4 Reddit : effacement définitif d'une publication constatée supprimée (fichiers R2, lignes D1, index), sans effacer sur une réponse invalide de l'API. _Exig. 5.5_
 
 ## Phase 5 — Connecteur Reddit → `v0.5` (code prêt ; activation seulement après approbation de 0.3)
 - [x] 5.1 OAuth, secrets Wrangler, User-Agent conforme. _Exig. 6.2_

@@ -81,7 +81,7 @@ Le curseur est une date ISO conservée dans `creators.cursor`, mise à jour par 
 | Médias | images et vidéo intégrées | image `i.redd.it`, galerie (`media_metadata`), vidéo `v.redd.it` | `media_attachments` : `image`, `video` et `gifv` (boucle sans son, traitée comme GIF) ; l'audio est ignoré |
 | Description du média | `alt` de chaque image | légende de l'élément de galerie | `description` de la pièce jointe |
 | Suppression | URI absente de `app.bsky.feed.getPosts` | `/api/info?id=t3_…` : auteur `[deleted]` ou contenu retiré | `GET /api/v1/statuses/:id` répond 404 ou 410 (toute autre erreur laisse le statut inchangé) |
-| Conséquence | statut « supprimé », copie conservée | statut « supprimé », copie conservée (pas de purge en v1) | statut « supprimé », copie conservée (Q5) |
+| Conséquence | statut « supprimé », copie conservée | effacement définitif de la publication (D1 et R2) | statut « supprimé », copie conservée (Q5) |
 
 Mastodon : identifiants `mastodon:<serveur>:<id du compte>` (créateur) et `mastodon:<serveur>:<id du message>` (publication), car les identifiants numériques ne sont uniques que par serveur. Le champ `creators.handle` conserve `nom@serveur`, dont le connecteur déduit le serveur à interroger. `nativeRef` est l'URL de l'API du message (`https://<serveur>/api/v1/statuses/<id>`). Le nom du serveur est validé (nom d'hôte public, sans adresse IP ni port). Le quota se lit dans `X-RateLimit-Remaining` et `X-RateLimit-Reset` (horodatage ISO 8601).
 
@@ -159,9 +159,10 @@ Transitions : `active` ⇄ `paused` ; `active` ou `paused` → `deleted` ; `dele
 - Une synchronisation manuelle simultanée à un passage planifié est sans danger : l'insertion des publications est idempotente.
 
 ## Vérification des suppressions
-- `POST /api/creators/:id/verify` traite un lot de 25 publications (les moins récemment vérifiées lors de la session en cours) et renvoie `{ startedAt, processed, deleted, remaining }`. Le corps de la requête porte `startedAt` (`null` au premier appel) : la galerie le renvoie à chaque appel, ce qui délimite la session de vérification.
+- `POST /api/creators/:id/verify` traite un lot de 25 publications (les moins récemment vérifiées lors de la session en cours) et renvoie `{ startedAt, processed, deleted, purged, remaining }` (`deleted` : publications marquées « supprimées » et conservées ; `purged` : publications effacées de l'archive). Le corps de la requête porte `startedAt` (`null` au premier appel) : la galerie le renvoie à chaque appel, ce qui délimite la session de vérification.
 - La galerie rappelle l'endpoint jusqu'à `remaining = 0` (ou `processed = 0`) et affiche la progression : aucun traitement long côté serveur, aucun déclenchement planifié.
-- Bluesky et Reddit : statut `deleted`, copie conservée. Purge reportée (voir exigences).
+- Bluesky et Mastodon : statut `deleted`, copie conservée (Q2, Q5).
+- Reddit : effacement définitif de la publication (`purgePosts` dans `src/purge/` : fichiers R2 sous son préfixe, puis lignes `media`, `posts` et index de recherche), car les conditions de l'API Reddit l'exigent. Une réponse invalide de `/api/info` (corps ou liste absents) lève une erreur et n'efface rien : l'effacement est irréversible. La constatation reste à la demande, donc une publication supprimée à la source n'est effacée qu'au prochain lancement de la vérification.
 
 ## API
 | Méthode | Route | Rôle |
