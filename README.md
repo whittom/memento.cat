@@ -80,7 +80,7 @@ node scripts/wrangler-config.mjs
 
 ### Déploiement automatique depuis GitHub
 
-Le workflow `.github/workflows/deploy.yml` vérifie le code (typecheck, lint, tests), génère `wrangler.jsonc`, applique les migrations D1, puis déploie. Il se lance à chaque étiquette de version poussée (`git tag -a v0.1.15 -m "…" && git push origin v0.1.15`), ou à la main depuis l'onglet **Actions**. Rien de propre à votre installation n'est versionné : tout vient des secrets du dépôt (**Settings → Secrets and variables → Actions**).
+Deux workflows GitHub Actions. `.github/workflows/verify.yml` vérifie chaque pull request (y compris celles de Dependabot) et chaque envoi sur `main` : typecheck, lint, tests, compilation de la galerie et `npm audit` ; il n'utilise aucun secret et ne déploie rien. Le workflow `.github/workflows/deploy.yml` vérifie le code (typecheck, lint, tests), génère `wrangler.jsonc`, applique les migrations D1, puis déploie. Il se lance à chaque étiquette de version poussée (`git tag -a v0.1.15 -m "…" && git push origin v0.1.15`), ou à la main depuis l'onglet **Actions**. Rien de propre à votre installation n'est versionné : tout vient des secrets du dépôt (**Settings → Secrets and variables → Actions**).
 
 | Secret | Contenu |
 | --- | --- |

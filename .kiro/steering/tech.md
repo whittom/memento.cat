@@ -20,6 +20,7 @@ inclusion: always
 - `npm run build:web` : compilation de la galerie vers `web/dist`.
 - `npm run deploy` : compile la galerie puis déploie (`wrangler deploy` seul publierait une galerie périmée).
 - `node scripts/wrangler-config.mjs` : génère `wrangler.jsonc` à partir de `wrangler.example.jsonc` et des valeurs de l'environnement (utilisé par le déploiement automatique, `.github/workflows/deploy.yml`, déclenché par une étiquette `v*`).
+- Intégration continue : `.github/workflows/verify.yml` (pull requests et `main`, sans secret) ; déploiement par `.github/workflows/deploy.yml` (étiquettes `v*`). Dependabot ouvre les correctifs de sécurité groupés, vérifiés par `verify.yml` avant fusion.
 - Licence : PolyForm Noncommercial 1.0.0 (`LICENSE.md`).
 
 ## Contraintes du plan gratuit
