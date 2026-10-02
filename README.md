@@ -2,6 +2,10 @@
 
 Archive personnelle des publications de créateurs suivis sur Bluesky, Mastodon et Reddit, avec une galerie de consultation monopage et adaptative. Le tout tourne dans un seul Cloudflare Worker (plan gratuit), avec D1 pour l'index et R2 pour les médias.
 
+## Une alternative simple au doomscrolling
+
+memento est aussi une façon plus calme de suivre ce que publient des gens qu'on aime lire, sans passer par les fils des réseaux sociaux et leur défilement sans fin (le « doomscrolling », ce défilement anxiogène qui retient l'attention). Il n'y a ici que les créateurs que vous avez choisis, leurs contributions originales avec médias (ni commentaires, ni republications, ni citations), aucun compteur de mentions « j'aime » ou de partages, aucune recommandation, aucune notification et aucune lecture automatique des vidéos. Les médias non consultés sont signalés et le bouton « Non consultés seulement » les isole : quand il n'y en a plus, c'est fini. Le détail de ces principes est dans `.kiro/steering/product.md`.
+
 La démarche est pilotée par spécifications (format Kiro) :
 
 - `.kiro/steering/` : contexte permanent et règles par technologie, tirées des guides officiels ;

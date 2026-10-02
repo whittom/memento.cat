@@ -6,6 +6,16 @@ inclusion: always
 ## Objectif
 Suivre des créateurs choisis sur les réseaux sociaux et conserver une archive personnelle de leurs publications (texte, titre, médias et descriptions de médias), consultable sans ouvrir les plateformes.
 
+## Intention : une alternative simple au doomscrolling
+memento est aussi une façon plus calme de suivre ce que publient des gens qu'on aime lire, sans passer par les fils des réseaux sociaux. Le défilement sans fin d'un fil algorithmique (le « doomscrolling ») est conçu pour retenir l'attention ; memento fait l'inverse : on consulte quand on le décide, et il y a une fin.
+- **Un ensemble fini et choisi** : seuls les créateurs suivis explicitement apparaissent. Ni recommandations, ni « tendances », ni contenu suggéré, ni publicités.
+- **Du contenu original seulement** : pas de commentaires, de réponses, de republications ni de citations d'autres comptes (donc pas de polémiques relayées) ; seules les publications avec images, vidéos ou GIF sont gardées.
+- **Aucun indicateur d'engagement** : ni mentions « j'aime », ni compteurs de partages ou de réponses, ni scores. Ils ne sont même pas archivés.
+- **Une ligne d'arrivée** : les médias non consultés sont signalés, un filtre « non consultés seulement » les isole, et on peut tout marquer comme consulté. Quand il n'y en a plus, c'est fini.
+- **Pas de sollicitation** : aucune notification, aucun courriel de rappel (le seul courriel est le code de connexion de Cloudflare Access), aucune lecture automatique des vidéos ; la collecte se fait en arrière-plan et rien ne réclame d'ouvrir la galerie.
+- **Ordre chronologique** : du plus récent au plus ancien, sans tri par popularité.
+- **À l'écart des plateformes** : on consulte l'archive sans ouvrir les applications d'origine, donc sans leurs fils ni leurs suggestions.
+
 ## Utilisateur
 Un seul utilisateur (le propriétaire de l'archive). Usage personnel et non commercial.
 

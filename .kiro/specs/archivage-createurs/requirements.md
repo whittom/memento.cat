@@ -2,6 +2,9 @@
 
 Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation indésirable), LE SYSTÈME DOIT (comportement attendu).
 
+## Intention
+Au-delà de l'archivage, memento est une alternative simple au « doomscrolling » (le défilement anxiogène des fils des réseaux sociaux) : un ensemble fini de créateurs choisis, de leurs seules contributions originales avec médias, consulté quand l'utilisateur le décide, sans fil algorithmique ni indicateur d'engagement, et avec une fin identifiable (les médias non consultés). Cette intention n'ajoute pas d'exigence propre : elle s'appuie sur les exigences 1 (liste choisie), 2.3 et 2.3b à 2.3c (contenu original avec médias), 4.12 à 4.16 (médias consultés et filtre « non consultés ») et sur les principes de `.kiro/steering/product.md`. Le chargement automatique de la suite de la liste au défilement la contrarie en partie : voir la question ouverte Q6.
+
 ## Exigence 1 — Gestion des créateurs suivis
 **Récit :** En tant qu'utilisateur, je veux déclarer les créateurs à suivre, afin que leurs publications soient archivées.
 
@@ -112,4 +115,5 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 - **Q2 — Bluesky et le contenu supprimé.** Vérifier dans les conditions développeur de Bluesky si la conservation d'une publication supprimée est permise. Le choix de ne pas purger s'applique aussi à Bluesky en v1.
 - **Q4 — Vidéos Reddit.** La vidéo archivée est la version sans piste audio (Reddit sert l'audio séparément). Ajouter l'audio exigerait un assemblage hors du Worker.
 - **Q5 — Mastodon et le contenu supprimé.** Le fediverse n'a pas de conditions d'API uniformes : chaque serveur fixe ses règles, et la culture du réseau attend que les suppressions se propagent. Par cohérence avec Bluesky, une publication Mastodon supprimée garde sa copie avec le statut « supprimé » (usage strictement personnel). À réévaluer, notamment si un serveur l'interdit.
+- **Q6 — Chargement automatique au défilement.** La galerie charge la page suivante dès qu'on approche du bas (un observateur d'intersection avec une marge de 800 px), en plus du bouton « Afficher plus ». Sur une archive longue, cela donne un défilement continu, ce que l'intention anti-doomscrolling cherche à éviter. Option à évaluer : ne garder que le bouton « Afficher plus » (une pause explicite à chaque page) et afficher le nombre de publications restantes. Non traitée pour l'instant.
 - **Q3 — Volume.** Estimer le volume vidéo par créateur pour valider les 10 Go gratuits de R2.
