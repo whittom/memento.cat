@@ -218,7 +218,7 @@ SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtra
 - Journaux JSON structurés par créateur et par exécution ; observabilité Workers activée.
 
 ## Tests
-État actuel : tests unitaires Vitest exécutés sous Node (`npm test`), dans `test/`, avec des données écrites à la main et une base D1 factice.
+État actuel : tests unitaires Vitest exécutés sous Node (`npm test`), dans `test/`, avec des données écrites à la main et une base D1 factice. Ils tournent sur chaque pull request et chaque envoi sur `main` (`.github/workflows/verify.yml`, avec typecheck, lint, compilation et `npm audit`), et avant chaque déploiement (`deploy.yml`).
 - Connecteurs (`bluesky.test.ts`, `reddit.test.ts`, `mastodon.test.ts`) : correspondance des réponses d'API vers `NormalizedPost`, y compris republications, citations d'un autre compte, republications croisées Reddit, originaux Bluesky, vidéos, galeries Reddit et détection d'une publication Reddit supprimée. Pour Mastodon, en plus : validation des noms de serveur, conversion du HTML, quota en horodatage ISO, et le connecteur entier avec des appels réseau simulés (résolution, pagination, curseur, vérification des suppressions). Aucun test de suppression côté Bluesky. Les réponses sont des objets écrits dans les tests, non des réponses enregistrées.
 - Stockage et API (`storage.test.ts`) : clés R2, extensions, `Budget` et `countingDb`, limiteur de quota, requête de recherche FTS, curseur de pagination et bornes de dates.
 - Collecte et synchronisation manuelle (`sync.test.ts`) : refus selon l'état du créateur, doublons, avancée du curseur, publications sans média, arrêt par budget. La base D1 y est simulée.

@@ -1,0 +1,39 @@
+# Vérifie chaque pull request (y compris celles de Dependabot) et chaque envoi sur main :
+# typecheck, lint, tests et compilation de la galerie. Aucun secret, aucun déploiement :
+# le déploiement se fait seulement par une étiquette de version (deploy.yml).
+name: Vérifications
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verifications-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, tests et compilation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:web
+
+      # Vulnérabilités connues dans les dépendances (sévérité élevée ou critique).
+      - run: npm audit --audit-level=high
