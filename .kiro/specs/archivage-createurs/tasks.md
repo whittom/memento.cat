@@ -47,6 +47,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 
 - [x] 3.14 Loupe dans la visionneuse : pleine résolution, déplacement, raccourcis clavier. _Exig. 4.22_
 
+- [x] 3.16 Filtre « Non consultés seulement » : bouton à bascule à la place de la case à cocher. _Exig. 4.15_
 - [x] 3.15 Fermeture de la visionneuse par un clic en dehors de l'image (marges d'ajustement comprises). _Exig. 4.23_
 
 ## Phase 4 — Vérification des suppressions → `v0.4`
