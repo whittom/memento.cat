@@ -358,16 +358,16 @@ export async function postsToVerify(
   creatorId: string,
   startedAt: string,
   limit: number,
-): Promise<Pick<PostRow, "id" | "native_ref">[]> {
+): Promise<Pick<PostRow, "id" | "native_ref" | "r2_prefix">[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, native_ref FROM posts
+      `SELECT id, native_ref, r2_prefix FROM posts
        WHERE creator_id = ? AND status = 'active' AND (checked_at IS NULL OR checked_at < ?)
        ORDER BY checked_at IS NOT NULL, checked_at
        LIMIT ?`,
     )
     .bind(creatorId, startedAt, limit)
-    .all<Pick<PostRow, "id" | "native_ref">>();
+    .all<Pick<PostRow, "id" | "native_ref" | "r2_prefix">>();
   return results;
 }
 

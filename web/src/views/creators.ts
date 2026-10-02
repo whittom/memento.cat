@@ -123,16 +123,24 @@ function creatorRow(c: Creator, refresh: () => void): HTMLElement {
     let startedAt: string | null = null;
     let checked = 0;
     let deleted = 0;
+    let purged = 0;
     try {
       for (;;) {
         const r = await api.verify(c.id, startedAt);
         startedAt = r.startedAt;
         checked += r.processed;
         deleted += r.deleted;
+        purged += r.purged;
         progress.textContent = `Vérification : ${checked} publications, ${r.remaining} restantes`;
         if (r.remaining === 0 || r.processed === 0) break;
       }
-      progress.textContent = deleted > 0 ? `Vérification terminée : ${plural(deleted, "publication supprimée", "publications supprimées")} par l'auteur.` : "Vérification terminée : aucune suppression.";
+      const parts = [
+        deleted > 0 ? `${plural(deleted, "publication supprimée", "publications supprimées")} par l'auteur (copie conservée)` : null,
+        purged > 0 ? `${plural(purged, "publication supprimée à la source effacée", "publications supprimées à la source effacées")} de l'archive` : null,
+      ].filter(Boolean);
+      progress.textContent = parts.length > 0 ? `Vérification terminée : ${parts.join(" ; ")}.` : "Vérification terminée : aucune suppression.";
+      // Des publications effacées changent les compteurs : on redessine la page.
+      if (purged > 0) refresh();
     } catch (e) {
       progress.textContent = `Vérification interrompue : ${errorText(e)} Relancez-la pour reprendre.`;
     } finally {

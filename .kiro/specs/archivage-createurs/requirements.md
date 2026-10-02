@@ -51,7 +51,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 3. QUAND l'utilisateur filtre par créateur, plateforme ou période, LE SYSTÈME DOIT afficher les publications correspondantes, de la plus récente à la plus ancienne.
 4. QUAND l'utilisateur saisit un mot-clé, LE SYSTÈME DOIT rechercher dans les titres, textes et descriptions de médias.
 5. QUAND l'utilisateur ouvre une publication, LE SYSTÈME DOIT afficher ses médias, titre, texte, descriptions, lien source, date de publication et date de capture.
-6. SI une publication porte le statut « supprimé », ALORS LE SYSTÈME DOIT l'afficher avec un badge « supprimé » (plateformes où la conservation est permise, voir exigence 5).
+6. SI une publication porte le statut « supprimé », ALORS LE SYSTÈME DOIT l'afficher avec un badge « supprimé ». Seules les publications Bluesky et Mastodon portent ce statut : une publication Reddit supprimée à la source est effacée (exigence 5.5).
 7. LE SYSTÈME DOIT refuser l'accès à la galerie et à l'API à toute personne autre que le propriétaire.
 
 ### Miniatures et visionneuse
@@ -85,7 +85,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 2. LE SYSTÈME NE DOIT PAS exécuter cette vérification de façon planifiée.
 3. PENDANT la vérification, LE SYSTÈME DOIT afficher la progression et respecter les quotas de l'exigence 2.6.
 4. QUAND une publication Bluesky n'est plus disponible, LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, et conserver la copie archivée, sous réserve de Q2.
-5. QUAND une publication Reddit n'est plus disponible, LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, comme pour Bluesky.
+5. QUAND une publication Reddit n'est plus disponible (supprimée par son auteur, retirée par un modérateur ou par Reddit, ou auteur dont le compte est supprimé), LE SYSTÈME DOIT l'effacer définitivement, conformément aux conditions de l'API Reddit : sa ligne dans D1 (publication, médias, index de recherche) et tous ses fichiers dans R2 (médias, miniatures, `post.json`), sans conserver de copie, de statut ni d'information d'identification de l'auteur. LE SYSTÈME NE DOIT PAS effacer sur une réponse incomplète ou invalide de l'API Reddit (corps ou liste de publications absents, erreur HTTP, quota atteint) : seule une réponse valide qui signale la publication comme retirée, ou qui l'omet, déclenche l'effacement.
 6. QUAND une publication Mastodon n'est plus disponible sur son serveur (erreur 404 ou 410), LE SYSTÈME DOIT lui attribuer le statut « supprimé » avec la date de constat, comme pour Bluesky ; toute autre erreur (connexion exigée, serveur indisponible) NE DOIT PAS la faire passer à « supprimé ».
 
 ## Exigence 6 — Conformité aux plateformes
@@ -108,7 +108,7 @@ Notation EARS : QUAND (événement), TANT QUE (état), SI … ALORS (situation i
 2. LE SYSTÈME DOIT offrir une exportation complète de l'archive (médias et `post.json`) vers un dossier local.
 
 ## Questions ouvertes
-- **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1. Écart assumé avec les conditions Reddit, à réévaluer lors de la demande d'accès.
+- **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1. Reprise le 2026-10-01 : la purge est implémentée (exigence 5.5), ce qui supprime l'écart avec les conditions Reddit. Reste la fréquence : la vérification est à la demande (exigence 5.2) et Reddit recommande de supprimer sous 48 heures ; tant qu'aucune vérification n'est lancée, une publication supprimée à la source reste dans l'archive. Option à évaluer si Reddit l'exige : vérification planifiée limitée à Reddit.
 - **Q2 — Bluesky et le contenu supprimé.** Vérifier dans les conditions développeur de Bluesky si la conservation d'une publication supprimée est permise. Le choix de ne pas purger s'applique aussi à Bluesky en v1.
 - **Q4 — Vidéos Reddit.** La vidéo archivée est la version sans piste audio (Reddit sert l'audio séparément). Ajouter l'audio exigerait un assemblage hors du Worker.
 - **Q5 — Mastodon et le contenu supprimé.** Le fediverse n'a pas de conditions d'API uniformes : chaque serveur fixe ses règles, et la culture du réseau attend que les suppressions se propagent. Par cohérence avec Bluesky, une publication Mastodon supprimée garde sa copie avec le statut « supprimé » (usage strictement personnel). À réévaluer, notamment si un serveur l'interdit.

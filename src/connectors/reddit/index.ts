@@ -107,6 +107,11 @@ export class RedditConnector implements Connector {
 
   async checkStates(nativeRefs: string[]): Promise<Map<string, PostState>> {
     const body = obj(obj(await this.get("/api/info", new URLSearchParams({ id: nativeRefs.join(",") })))?.["data"]);
+    // Une réponse sans liste de publications ne prouve rien : l'effacement qui suit est irréversible,
+    // on refuse donc de conclure plutôt que de déclarer toutes les publications supprimées.
+    if (!body || !Array.isArray(body["children"])) {
+      throw new PlatformError("reddit", "Réponse inattendue de /api/info : aucune publication effacée");
+    }
     const states = new Map<string, PostState>(nativeRefs.map((ref) => [ref, "deleted"]));
     for (const child of arr(body?.["children"])) {
       const data = obj(obj(child)?.["data"]);

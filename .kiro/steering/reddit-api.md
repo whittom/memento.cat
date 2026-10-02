@@ -21,12 +21,17 @@ Sources officielles (consultées le 2026-09-27) :
 - 100 requêtes par minute par identifiant client OAuth, moyennées sur 10 minutes.
 - Lire `X-Ratelimit-Remaining` et `X-Ratelimit-Reset` à chaque réponse ; suspendre sous le seuil configuré.
 
-## Contenu supprimé (écart assumé en v1)
-Décision projet du 2026-09-28 : pas de purge en v1, les publications supprimées gardent leur copie avec le statut « supprimé ». Rappel des règles officielles :
+## Contenu supprimé : effacement définitif
+Règles officielles :
 - Tout contenu supprimé de Reddit doit être supprimé de nos systèmes : titre, texte, URL, médias.
 - Un compte supprimé impose d'effacer toutes les informations d'identification de l'auteur.
 - Conserver un contenu supprimé, même anonymisé, viole les conditions.
-- Reddit recommande fortement de supprimer routinièrement les données stockées sous 48 heures (voir question ouverte Q1 dans `requirements.md`).
+- Reddit recommande fortement de supprimer routinièrement les données stockées sous 48 heures.
+
+Application (décision du 2026-10-01, qui remplace celle du 2026-09-28 « pas de purge ») : la vérification des suppressions efface définitivement toute publication Reddit constatée supprimée (`isRemoved` : auteur `[deleted]`, `removed_by_category` renseigné, texte `[deleted]` ou `[removed]`), fichiers R2 d'abord, puis lignes D1. Aucune copie ni statut « supprimé » n'est gardé.
+- L'effacement est irréversible : une réponse de `/api/info` sans `data.children` lève une erreur et n'efface rien, de même qu'une erreur HTTP ou un quota atteint. Une publication omise d'une réponse valide compte comme supprimée (Reddit ne renvoie plus les identifiants disparus).
+- La constatation reste à la demande (exigence 5.2). Pour approcher la recommandation de 48 heures, lancer régulièrement « Vérifier les suppressions » sur chaque créateur Reddit ; une vérification planifiée limitée à Reddit est l'option à évaluer si Reddit l'exige.
+- Si un compte Reddit suivi est lui-même supprimé, ses publications sont effacées à la vérification ; la fiche du créateur reste dans la liste jusqu'à ce que vous la supprimiez.
 
 ## Interdits
 Usage commercial ou revente sans accord écrit ; entraînement de modèles ; inférence de caractéristiques sensibles ; contournement des quotas.
