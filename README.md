@@ -68,9 +68,32 @@ Ajoutez ensuite vos créateurs depuis la page « Créateurs » de la galerie : l
 
 **Mise à jour** : après avoir récupéré une nouvelle version du code, appliquez d'abord les nouvelles migrations (`npm run db:migrate`), puis `npm run deploy`.
 
-### Déploiement automatique depuis GitHub (optionnel)
+Renseignez aussi `MASTODON_USER_AGENT` : un nom qui désigne votre installation auprès des administrateurs des serveurs Mastodon (par exemple `monsite.exemple (archive personnelle en lecture seule)`). La valeur par défaut est neutre.
 
-Les jetons vont dans les secrets du dépôt GitHub (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), jamais dans le code. `wrangler.jsonc` n'étant pas versionné, l'intégration doit le générer à partir de `wrangler.example.jsonc` et de variables du dépôt.
+Plutôt que de remplir `wrangler.jsonc` à la main, vous pouvez le générer à partir du modèle, avec le même script que le déploiement automatique :
+
+```sh
+D1_DATABASE_ID=<uuid> ROUTE_PATTERN=monsite.exemple ACCESS_TEAM_DOMAIN=<équipe>.cloudflareaccess.com \
+ACCESS_AUD=<aud> MASTODON_USER_AGENT="monsite.exemple (archive personnelle en lecture seule)" \
+node scripts/wrangler-config.mjs
+```
+
+### Déploiement automatique depuis GitHub
+
+Le workflow `.github/workflows/deploy.yml` vérifie le code (typecheck, lint, tests), génère `wrangler.jsonc`, applique les migrations D1, puis déploie. Il se lance à chaque étiquette de version poussée (`git tag -a v0.1.15 -m "…" && git push origin v0.1.15`), ou à la main depuis l'onglet **Actions**. Rien de propre à votre installation n'est versionné : tout vient des secrets du dépôt (**Settings → Secrets and variables → Actions**).
+
+| Secret | Contenu |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Jeton d'API Cloudflare (modèle « Edit Cloudflare Workers », plus la permission **D1 : Edit** pour les migrations), limité à votre compte |
+| `CLOUDFLARE_ACCOUNT_ID` | Identifiant du compte Cloudflare |
+| `D1_DATABASE_ID` | Identifiant de la base `memento-db` |
+| `ROUTE_PATTERN` | Domaine personnalisé (par exemple `monsite.exemple`) |
+| `ACCESS_TEAM_DOMAIN` | `<équipe>.cloudflareaccess.com` |
+| `ACCESS_AUD` | Identifiant d'audience (AUD) de l'application Access |
+| `MASTODON_USER_AGENT` | Facultatif : nom de votre installation auprès des serveurs Mastodon |
+| `REDDIT_USER_AGENT` | Facultatif, après approbation de Reddit |
+
+Les secrets ne sont transmis qu'aux étapes qui en ont besoin, jamais à l'installation des dépendances ni aux tests. Si une valeur obligatoire manque ou si le modèle a changé de forme, la génération échoue et rien n'est déployé. Les secrets Reddit du Worker (`REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`) restent gérés par `wrangler secret put` : le déploiement ne les touche pas.
 
 ## Plateformes prises en charge
 
@@ -123,9 +146,27 @@ Si l'index D1 est perdu, il se reconstruit à partir des `post.json` : appeler `
 ## Structure
 
 ```
-src/            Worker : collecte, connecteurs, stockage, API, contrôle d'accès
-web/            Galerie (SPA TypeScript, Vite)
-migrations/     Schéma D1
-test/           Tests unitaires
-.kiro/          Steering et spec
+src/                Worker : collecte, connecteurs, stockage, API, contrôle d'accès
+web/                Galerie (SPA TypeScript, Vite)
+migrations/         Schéma D1
+scripts/            Génération de wrangler.jsonc à partir du modèle
+test/               Tests unitaires
+.github/workflows/  Déploiement automatique sur Cloudflare
+.kiro/              Steering et spec
 ```
+
+## Usage responsable
+
+memento archive des publications d'autres personnes, pour un usage personnel. Si vous l'installez :
+
+- respectez les conditions de chaque plateforme (en particulier Reddit, qui exige une approbation préalable de l'accès à son API et l'effacement des contenus supprimés) ;
+- respectez les droits des auteurs : l'archive reste privée, protégée par Cloudflare Access, et n'est jamais republiée ;
+- identifiez honnêtement votre installation (`MASTODON_USER_AGENT`, `REDDIT_USER_AGENT`).
+
+Ce dépôt ne contient aucune donnée archivée. Il est fourni tel quel, sans garantie.
+
+## Licence
+
+[PolyForm Noncommercial 1.0.0](LICENSE.md) : l'usage, la modification et le partage sont permis à des fins non commerciales (usage personnel, recherche, organismes sans but lucratif, etc.). Tout usage commercial demande une licence distincte : contactez l'auteur par son profil GitHub.
+
+Les dépendances gardent leur propre licence (MIT ou Apache-2.0), et les polices Archivo et JetBrains Mono, chargées depuis Google Fonts, sont sous licence SIL Open Font License.

@@ -5,7 +5,6 @@ import type { Connector, ConnectorContext, FetchResult, NormalizedPost, PostStat
 import { isPublicHostname, mapStatus, parseHandle } from "./map";
 
 const PAGE_SIZE = 40;
-const USER_AGENT = "memento.cat (archive personnelle en lecture seule)";
 
 /** Identifiant de créateur "mastodon:<serveur>:<id du compte>" → serveur et compte. */
 function splitCreatorId(id: string): { host: string; accountId: string } {
@@ -27,7 +26,7 @@ export class MastodonConnector implements Connector {
   private async request(host: string, path: string, params?: URLSearchParams): Promise<Response> {
     const query = params ? `?${params.toString()}` : "";
     const res = await this.ctx.budget.fetch(`https://${host}${path}${query}`, {
-      headers: { accept: "application/json", "user-agent": USER_AGENT },
+      headers: { accept: "application/json", "user-agent": this.ctx.config.mastodonUserAgent },
       redirect: "manual",
     });
     checkRateLimit("mastodon", res, this.ctx.config.rateLimitFloor);

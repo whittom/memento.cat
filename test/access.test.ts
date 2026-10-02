@@ -8,7 +8,7 @@ const team = "equipe.cloudflareaccess.com";
 const aud = "aud-memento";
 const config: Config = {
   requireAccess: true, accessTeamDomain: team, accessAud: aud,
-  maxSubrequestsPerRun: 45, maxQueriesPerRun: 40, maxPagesPerCreator: 3, maxMediaBytes: 1, rateLimitFloor: 10, redditUserAgent: "",
+  maxSubrequestsPerRun: 45, maxQueriesPerRun: 40, maxPagesPerCreator: 3, maxMediaBytes: 1, rateLimitFloor: 10, redditUserAgent: "", mastodonUserAgent: "memento (test)",
 };
 
 let privateKey: CryptoKey;

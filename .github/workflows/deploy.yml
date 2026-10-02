@@ -1,0 +1,64 @@
+# Déploiement automatique sur Cloudflare à chaque étiquette de version (v0.1.15, v1.0, ...),
+# ou à la demande (onglet Actions). La configuration propre à l'installation (identifiant D1, domaine,
+# Cloudflare Access, User-Agent) vient des secrets du dépôt : rien de personnel n'est versionné.
+# Secrets attendus : voir la section « Déploiement automatique » du README.
+name: Déploiement
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploiement
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Vérifier puis déployer sur Cloudflare
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Aucun secret n'est exposé aux étapes qui exécutent le code des dépendances.
+      - run: npm ci
+
+      - name: Vérifications
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      - name: Générer wrangler.jsonc
+        run: node scripts/wrangler-config.mjs
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          ROUTE_PATTERN: ${{ secrets.ROUTE_PATTERN }}
+          ACCESS_TEAM_DOMAIN: ${{ secrets.ACCESS_TEAM_DOMAIN }}
+          ACCESS_AUD: ${{ secrets.ACCESS_AUD }}
+          MASTODON_USER_AGENT: ${{ secrets.MASTODON_USER_AGENT }}
+          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
+
+      - name: Appliquer les migrations D1
+        run: npm run db:migrate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Compiler la galerie et déployer le Worker
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

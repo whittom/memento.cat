@@ -8,7 +8,12 @@ export interface Config {
   maxMediaBytes: number;
   rateLimitFloor: number;
   redditUserAgent: string;
+  /** User-Agent envoyé aux serveurs Mastodon : il identifie l'installation auprès de leurs administrateurs. */
+  mastodonUserAgent: string;
 }
+
+/** Valeur neutre : chaque installation devrait la remplacer par un nom qui la désigne (MASTODON_USER_AGENT). */
+export const DEFAULT_MASTODON_USER_AGENT = "memento (archive personnelle en lecture seule)";
 
 function int(value: string | undefined, fallback: number): number {
   const n = Number.parseInt(value ?? "", 10);
@@ -27,5 +32,6 @@ export function readConfig(env: Env): Config {
     maxMediaBytes: int(env.MAX_MEDIA_BYTES, 100 * 1024 * 1024),
     rateLimitFloor: int(env.RATE_LIMIT_FLOOR, 10),
     redditUserAgent: env.REDDIT_USER_AGENT ?? "",
+    mastodonUserAgent: env.MASTODON_USER_AGENT || DEFAULT_MASTODON_USER_AGENT,
   };
 }

@@ -3,7 +3,7 @@
 Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N` nommées par phase ci-dessous étaient le plan initial ; le dépôt a en pratique été livré d'un bloc en `v0.1` (2026-09-30), puis versionné par incréments `v0.1.x` (`v0.1.1` synchronisation manuelle, `v0.1.2` citations Bluesky, `v0.1.3` refonte visuelle). `v1.0` est réservé à la fin de la phase 6.
 
 ## Phase 0 — Préalables
-- [x] 0.1 Pousser le dépôt Git sur GitHub (dépôt privé `whittom/memento.cat`).
+- [x] 0.1 Pousser le dépôt Git sur GitHub.
 - [x] 0.2 Créer le compte Cloudflare, le bucket R2 `memento-media` et la base D1 `memento-db`.
 - [ ] 0.3 Déposer la demande d'accès à l'API Reddit (délai inconnu : à lancer dès maintenant). Brouillon prêt dans `docs/reddit-access-request.md`, non envoyé. _Exig. 6.4_
 - [x] 0.4 Trancher Q1 : Reddit conservé, sans purge en v1 (décision remplacée le 2026-10-01 : voir 4.4).
@@ -80,8 +80,14 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] R.7 Documentation alignée sur le code (README, steering, conception).
 - [x] R.8 En-tête `Content-Security-Policy` stricte, avec un test de compatibilité de la galerie (livré en `v0.1.12`). _Exig. 4.7_
 
+## Publication du dépôt (livrée en `v0.1.15`)
+- [x] P.1 Licence PolyForm Noncommercial 1.0.0 (`LICENSE.md`, `package.json`), `SECURITY.md`, section « Usage responsable » du README.
+- [x] P.2 Nettoyage : plus de nom de dépôt ni d'équipe Access dans la documentation ; User-Agent Mastodon configurable (`MASTODON_USER_AGENT`), avec une valeur par défaut neutre.
+- [x] P.3 Déploiement automatique : `scripts/wrangler-config.mjs` (testé) génère `wrangler.jsonc` à partir du modèle et des secrets ; `.github/workflows/deploy.yml` vérifie, migre et déploie à chaque étiquette `v*`.
+- [ ] P.4 Enregistrer les secrets du dépôt sur GitHub, puis passer le dépôt en public (réglages de sécurité : analyse des secrets, protection des envois, signalement privé de vulnérabilités).
+
 ## Phase 6 — Mise en service → `v1.0`
-- [x] 6.1 Cloudflare Access devant la galerie et l'API (application `memento.cat`, politique limitée au propriétaire, équipe `whittom`) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
+- [x] 6.1 Cloudflare Access devant la galerie et l'API (application auto-hébergée sur le domaine, politique limitée au propriétaire) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
 - [ ] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, à faire.
 - [x] 6.3 Exportation complète vers un dossier local et procédure de sauvegarde (rclone, voir README). _Exig. 7.2_
 - [ ] 6.5 Premier passage réel sur Bluesky et Reddit : valider les correspondances sur des réponses réelles.
