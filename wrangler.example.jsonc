@@ -42,7 +42,9 @@
     "MAX_MEDIA_BYTES": "104857600",
     "RATE_LIMIT_FLOOR": "10",
     // Pour Reddit : "<plateforme>:<id app>:<version> (by /u/<utilisateur>)"
-    "REDDIT_USER_AGENT": ""
+    "REDDIT_USER_AGENT": "",
+    // Nom qui identifie cette installation auprès des serveurs Mastodon, par exemple "monsite.exemple (archive personnelle en lecture seule)".
+    "MASTODON_USER_AGENT": "memento (archive personnelle en lecture seule)"
   },
 
   "observability": {

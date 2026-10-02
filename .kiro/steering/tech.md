@@ -19,6 +19,8 @@ inclusion: always
 - `npm run typecheck`, `npm run lint`, `npm test` : vérifications, toutes attendues sans erreur.
 - `npm run build:web` : compilation de la galerie vers `web/dist`.
 - `npm run deploy` : compile la galerie puis déploie (`wrangler deploy` seul publierait une galerie périmée).
+- `node scripts/wrangler-config.mjs` : génère `wrangler.jsonc` à partir de `wrangler.example.jsonc` et des valeurs de l'environnement (utilisé par le déploiement automatique, `.github/workflows/deploy.yml`, déclenché par une étiquette `v*`).
+- Licence : PolyForm Noncommercial 1.0.0 (`LICENSE.md`).
 
 ## Contraintes du plan gratuit
 - 5 déclencheurs Cron par compte : un seul déclencheur pour tout le projet, toutes les 15 minutes.

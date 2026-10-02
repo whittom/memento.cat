@@ -192,10 +192,10 @@ SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtra
 | Élément | Où | Versionné ? |
 | --- | --- | --- |
 | Créateurs suivis | table `creators` (D1), gérée depuis la galerie | non |
-| Réglages non secrets (fréquence, seuils, tailles max) | `vars` dans `wrangler.jsonc` | oui (valeurs par défaut) |
+| Réglages non secrets (fréquence, seuils, tailles max, User-Agent Mastodon par défaut) | `vars` dans `wrangler.jsonc` | oui (valeurs par défaut, dans `wrangler.example.jsonc`) |
 | Identifiants des ressources (D1, R2, domaine) | `wrangler.jsonc`, généré depuis `wrangler.example.jsonc` | non (`.gitignore`) |
 | Secrets Reddit (client, secret) | `wrangler secret put` ; en local `.dev.vars` | non (`.gitignore`) |
-| Jeton de déploiement Cloudflare | secrets du dépôt GitHub (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) | non |
+| Jeton de déploiement et valeurs propres à l'installation (D1, domaine, Access, User-Agent) | secrets du dépôt GitHub, lus par `.github/workflows/deploy.yml` ; `scripts/wrangler-config.mjs` en tire `wrangler.jsonc` à partir de `wrangler.example.jsonc` | non |
 
 ## Présentation dans la galerie
 - **Tuile simple** : la miniature, avec une pastille « nouveau » tant que le média n'est pas consulté ; une fois consulté, la pastille disparaît et la tuile est légèrement atténuée.

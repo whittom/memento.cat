@@ -26,6 +26,8 @@ web/                    # SPA (Vite), compilée vers web/dist
   src/views/            # galerie, créateurs, visionneuse
   src/zoom.ts           # calculs de la loupe (purs, testés)
 migrations/             # migrations D1 numérotées
+scripts/                # génération de wrangler.jsonc à partir du modèle (déploiement)
+.github/workflows/      # déploiement automatique sur Cloudflare (étiquettes v*)
 test/                   # tests Vitest (un fichier par domaine : connecteurs, stockage, accès, collecte, loupe)
 .kiro/                  # steering et specs
 ```
