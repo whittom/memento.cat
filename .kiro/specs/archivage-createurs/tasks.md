@@ -86,7 +86,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] P.3 Déploiement automatique : `scripts/wrangler-config.mjs` (testé) génère `wrangler.jsonc` à partir du modèle et des secrets ; `.github/workflows/deploy.yml` vérifie, migre et déploie à chaque étiquette `v*`.
 - [x] P.4 Secrets du dépôt enregistrés ; premier déploiement automatique réussi (étiquette `v0.1.15`).
 - [x] P.5 Wrangler 4.146 (corrige trois vulnérabilités de dépendances de développement : undici, miniflare, wrangler) et workflow `verify.yml` qui vérifie chaque pull request, dont celles de Dependabot (livré en `v0.1.16`).
-- [ ] P.6 Réglages de sécurité GitHub restants : signalement privé de vulnérabilités, CodeQL (configuration par défaut).
+- [x] P.6 Réglages de sécurité GitHub : dépôt public, analyse des secrets et protection des envois, signalement privé de vulnérabilités, CodeQL (configuration par défaut), alertes et correctifs Dependabot groupés. Mention de droits d'auteur de `LICENSE.md` confirmée.
 
 ## Phase 6 — Mise en service → `v1.0`
 - [x] 6.1 Cloudflare Access devant la galerie et l'API (application auto-hébergée sur le domaine, politique limitée au propriétaire) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
