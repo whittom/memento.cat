@@ -28,6 +28,10 @@
   ],
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "memento-media" }],
 
+  // Miniatures fabriquées pour les images qui n'en ont pas (exigence 10). Plan gratuit : 5 000 transformations
+  // uniques par mois ; au-delà, les images restent sans miniature (la tuile charge l'original).
+  "images": { "binding": "IMAGES" },
+
   "vars": {
     // Contrôle d'accès : "true" en production. ACCESS_TEAM_DOMAIN = "<équipe>.cloudflareaccess.com".
     "REQUIRE_ACCESS": "true",

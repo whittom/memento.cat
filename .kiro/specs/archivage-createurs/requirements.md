@@ -135,6 +135,17 @@ Reprise de l'exigence L10 de memento-local (2026-10-03), limitée à ce qui s'ex
    - il écrit `post.json` avant la base et ne supprime les fichiers en double qu'après : une interruption laisse une archive cohérente, et l'appel suivant termine le travail ;
    - il peut être limité à un créateur (`{"creator": "<id>"}`).
 
+## Exigence 10 — Miniatures fabriquées
+**Récit :** En tant qu'utilisateur, je veux que la galerie charge de petites images, pas les originaux de plusieurs mégaoctets.
+
+Reprise de l'exigence L12 de memento-local (v0.5.1), avec la liaison Cloudflare Images au lieu de `sharp`. Le rattrapage des images déjà archivées n'est pas repris (décision du 2026-10-05).
+
+1. QUAND une image est archivée sans miniature (aucune fournie par la plateforme, ou téléchargement refusé), LE SYSTÈME DOIT en fabriquer une : image réduite pour tenir dans **480 × 480 px**, proportions conservées, jamais agrandie, au format WebP, rangée sous `media_NN.thumb.webp` à côté de l'original.
+2. LE SYSTÈME NE DOIT PAS en fabriquer pour une miniature déjà fournie, pour un média lié à un original (exigence 9 : il se sert de la miniature de l'original), pour une vidéo, pour un SVG, pour une image de plus de 20 Mo (limite de la liaison) ni pour une image illisible. Aucune erreur : la tuile affiche alors l'original, comme avant.
+3. SI la liaison est absente ou refuse la transformation (par exemple quota mensuel atteint), ALORS l'archivage de la publication DOIT réussir sans miniature.
+4. LA miniature DOIT être enregistrée comme les autres (`thumb_r2_key`, `thumb_width`, `thumb_height`, `post.json`), donc survivre à la reconstruction de l'index.
+5. LA galerie DOIT utiliser la miniature dans les tuiles ; la visionneuse garde l'original.
+
 ## Questions ouvertes
 - **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1. Reprise le 2026-10-01 : la purge est implémentée (exigence 5.5), ce qui supprime l'écart avec les conditions Reddit. Reste la fréquence : la vérification est à la demande (exigence 5.2) et Reddit recommande de supprimer sous 48 heures ; tant qu'aucune vérification n'est lancée, une publication supprimée à la source reste dans l'archive. Option à évaluer si Reddit l'exige : vérification planifiée limitée à Reddit.
 - **Q2 — Bluesky et le contenu supprimé.** Vérifier dans les conditions développeur de Bluesky si la conservation d'une publication supprimée est permise. Le choix de ne pas purger s'applique aussi à Bluesky en v1.

@@ -6,6 +6,7 @@ import { log } from "../lib/log";
 import { findOriginal, insertPost, type MediaInsert, type OriginalOf } from "../storage/db";
 import { extensionFor, mediaKey, postJsonKey, postPrefix, thumbKey } from "../storage/keys";
 import { putJson, storeRemoteFile } from "../storage/r2";
+import { makeThumbnail } from "../storage/thumbnail";
 
 const MAX_THUMB_BYTES = 5 * 1024 * 1024;
 
@@ -125,6 +126,18 @@ export async function archivePost(
       } catch (e) {
         if (e instanceof BudgetExhaustedError) throw e;
         log.warn("échec du téléchargement d'une miniature", { post: post.id, position, error: errorMessage(e) });
+      }
+    }
+
+    // Une image sans miniature en reçoit une, fabriquée (exigence 10) ; un doublon se sert de celle de l'original.
+    if (row.kind === "image" && row.downloaded === 1 && row.r2_key && row.thumb_r2_key === null) {
+      const thumb = await makeThumbnail(env.IMAGES, env.MEDIA, row.r2_key, row.mime_type, row.bytes);
+      if (thumb) {
+        const key = thumbKey(prefix, position, "webp");
+        await env.MEDIA.put(key, thumb.bytes, { httpMetadata: { contentType: "image/webp" } });
+        row.thumb_r2_key = key;
+        row.thumb_width = thumb.width;
+        row.thumb_height = thumb.height;
       }
     }
     rows.push(row);

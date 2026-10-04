@@ -125,6 +125,10 @@ for (let r; !r || r.remaining > 0; ) {
 
 Ajouter `"creator": "<id>"` au corps pour se limiter à un créateur. Une sauvegarde (rclone, ci-dessous) est conseillée avant l'application.
 
+## Miniatures
+
+Quand une plateforme ne fournit pas de miniature (images Reddit, par exemple), memento en fabrique une à l'archivage : l'image réduite à 480 px au plus, en WebP, rangée à côté de l'original (`media_NN.thumb.webp`). La galerie charge cette miniature dans les tuiles et ne charge l'original que dans la visionneuse. Elle est fabriquée par la liaison Cloudflare Images (`images` dans `wrangler.example.jsonc`) : aucun réglage de zone, 5 000 transformations uniques gratuites par mois. Au-delà, ou pour une image de plus de 20 Mo, l'image reste sans miniature et la tuile charge l'original. Les images archivées avant cette fonction ne reçoivent pas de miniature.
+
 ## Synchronisation manuelle
 
 En plus de la collecte planifiée (toutes les 15 minutes), le bouton **Synchroniser maintenant** de la page « Créateurs » collecte un seul créateur actif sans attendre le prochain passage. Il suit les mêmes règles que la collecte planifiée (curseur, budget de sous-requêtes, quotas, aucun doublon) et enchaîne les appels avec la progression affichée, jusqu'à ce que le curseur soit rejoint.

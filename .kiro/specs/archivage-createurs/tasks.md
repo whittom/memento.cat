@@ -97,6 +97,11 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 9.6 Tests sur une vraie base SQLite (migrations du dépôt) et un faux R2 : `test/duplicates.test.ts`.
 - [ ] 9.7 Appliquer la migration 0004 en production et lancer le rattrapage (simulation, puis application).
 
+## Miniatures fabriquées (repris de memento-local v0.5.1 le 2026-10-05)
+- [x] 10.1 Liaison Images (`wrangler.example.jsonc`, types), `makeThumbnail` et branchement dans `archivePost`. _Exig. 10.1 à 10.4_
+- [x] 10.2 Tests (fausse liaison Images, base SQLite réelle) : `test/thumbnail.test.ts`. _Exig. 10.1 à 10.3_
+- [ ] 10.3 Après déploiement : archiver une image sans miniature et vérifier la tuile ; surveiller le quota de transformations.
+
 ## Phase 6 — Mise en service → `v1.0`
 - [x] 6.1 Cloudflare Access devant la galerie et l'API (application auto-hébergée sur le domaine, politique limitée au propriétaire) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
 - [ ] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, à faire.

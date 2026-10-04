@@ -226,6 +226,13 @@ Repris de memento-local (§ 19 de sa conception), adapté au Worker : liaisons D
 - **Rattrapage (`src/dedupe/`, `POST /api/admin/dedupe`) :** le plan (une requête D1, puis un `head` R2 par original candidat) relie, par créateur, les médias de même genre, empreinte et taille au premier archivé dont le fichier existe. Chaque appel avec `apply` relie au plus 8 doublons (environ 4 requêtes D1 et 4 opérations R2 chacun, sous la limite de 50 requêtes D1 du plan gratuit) et recalcule le plan à l'appel suivant.
 - **Non repris de memento-local :** les empreintes visuelles (quasi-doublons), qui exigent `sharp` ; la complétion par capture, absente de memento.cat.
 
+## Miniatures fabriquées (exigence 10)
+- **Technologie :** la liaison Cloudflare Images (`"images": { "binding": "IMAGES" }`, `env.IMAGES`). Elle décode et réduit l'image hors du Worker : le temps processeur du plan gratuit (10 ms) n'est pas entamé, et aucun module natif n'est nécessaire (`sharp`, utilisé par memento-local, ne tourne pas dans un Worker). Aucun domaine ni zone à configurer.
+- **`makeThumbnail` (`src/storage/thumbnail.ts`) :** lit l'original dans R2, appelle `input(flux).transform({ width: 480, height: 480, fit: "scale-down" }).output({ format: "image/webp", quality: 78 })`, puis lit les dimensions du résultat avec `info()` (gratuit). Renvoie `null`, sans exception, si la liaison manque, si le type n'est pas une image (ou est un SVG), si la source dépasse 20 Mo, ou si la transformation échoue.
+- **Archivage (`archivePost`) :** après le téléchargement de la miniature fournie, une image téléchargée, non liée, sans `thumb_r2_key` reçoit la sienne, écrite sous `thumbKey(préfixe, position, "webp")`. Un doublon (reconnu avant) n'arrive jamais à cette étape. Les opérations de la liaison et de R2 ne comptent pas dans le budget de sous-requêtes ni de requêtes D1.
+- **Coût :** le plan gratuit de Cloudflare Images offre 5 000 transformations uniques par mois ; la liaison facture chaque combinaison source et paramètres une fois par mois. Au-delà, la transformation échoue et l'image reste sans miniature (exigence 10.3).
+- **Non repris :** le script de rattrapage `npm run thumbnails` de memento-local. Les images déjà archivées sans miniature le restent ; la tuile charge l'original.
+
 ## Erreurs et observabilité
 - Classes d'erreur typées par cause (quota, introuvable, plateforme).
 - Journaux JSON structurés par créateur et par exécution ; observabilité Workers activée.
