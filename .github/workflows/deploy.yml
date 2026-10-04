@@ -60,5 +60,7 @@ jobs:
       - name: Compiler la galerie et déployer le Worker
         run: npm run deploy
         env:
+          # Version affichée dans le pied de page de la galerie : l'étiquette déployée.
+          APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
