@@ -20,6 +20,7 @@ export function filtersFromParams(params: URLSearchParams, creatorId?: string): 
     q: params.get("q") ?? undefined,
     status: params.get("status") ?? undefined,
     unviewed: params.get("unviewed") === "1",
+    hideDuplicates: params.get("duplicates") === "hide",
   };
 }
 
@@ -32,6 +33,7 @@ function filtersToQuery(f: Filters, omitCreator: boolean): string {
   if (f.q) q.set("q", f.q);
   if (f.status) q.set("status", f.status);
   if (f.unviewed) q.set("unviewed", "1");
+  if (f.hideDuplicates) q.set("duplicates", "hide");
   const s = q.toString();
   return s ? `?${s}` : "";
 }
@@ -57,6 +59,7 @@ export function renderTile(post: Post, onOpen: (post: Post, index: number) => vo
     isGroup ? plural(post.media.length, "élément", "éléments") : null,
     state === "new" ? "non consulté" : state === "partial" ? plural(unviewed, "non vu", "non vus") : state === "viewed" ? "consulté" : null,
     post.status === "deleted" ? "supprimé par l'auteur" : null,
+    post.duplicate ? "doublon" : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -81,6 +84,8 @@ export function renderTile(post: Post, onOpen: (post: Post, index: number) => vo
     isGroup ? h("span", { class: "badge badge-count" }, svgIcon("stack"), String(post.media.length)) : null,
     first && (first.kind === "video" || first.kind === "gif") ? h("span", { class: "badge badge-kind" }, svgIcon("play"), first.kind === "gif" ? "GIF" : "Vidéo") : null,
     post.status === "deleted" ? h("span", { class: "badge badge-deleted" }, "Supprimé") : null,
+    // Icône et texte : jamais la couleur seule.
+    post.duplicate ? h("span", { class: "badge badge-duplicate", title: "Tous les médias de cette publication sont identiques à des médias déjà archivés" }, svgIcon("duplicate"), "Doublon") : null,
   );
 
   const mark =
@@ -184,7 +189,7 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
 
   // --- Filtres ---
   let searchTimer: number | undefined;
-  const activeCount = [filters.platform && !creator, filters.creator && !creator, filters.from, filters.to, filters.status, filters.unviewed].filter(Boolean).length;
+  const activeCount = [filters.platform && !creator, filters.creator && !creator, filters.from, filters.to, filters.status, filters.unviewed, filters.hideDuplicates].filter(Boolean).length;
   const wide = window.matchMedia("(min-width: 64rem)").matches;
   const form = h(
     "form",
@@ -271,6 +276,16 @@ export async function renderGallery(opts: GalleryOptions): Promise<GalleryState>
       },
       "Non consultés seulement",
     ),
+    h(
+      "button",
+      {
+        type: "button",
+        class: `btn btn-toggle${filters.hideDuplicates ? " is-on" : ""}`,
+        "aria-pressed": String(Boolean(filters.hideDuplicates)),
+        onclick: () => applyFilters({ hideDuplicates: !filters.hideDuplicates }),
+      },
+      "Masquer les doublons",
+    ),
     )),
   );
   root.append(form);
@@ -319,7 +334,7 @@ function emptyMessage(f: Filters, creatorCount: number): HTMLElement {
   if (creatorCount === 0) {
     return h("span", {}, "Aucun créateur suivi pour l'instant. ", h("a", { href: "/createurs", "data-link": true }, "Ajoutez un créateur"), " pour commencer l'archive.");
   }
-  const filtered = f.q || f.from || f.to || f.status || f.unviewed || f.platform;
+  const filtered = f.q || f.from || f.to || f.status || f.unviewed || f.hideDuplicates || f.platform;
   return h(
     "span",
     {},

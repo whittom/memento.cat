@@ -106,6 +106,25 @@ Les secrets ne sont transmis qu'aux étapes qui en ont besoin, jamais à l'insta
 - **Mastodon** : seuls les messages avec images, vidéos ou GIF du créateur sont archivés, sans republications ni réponses à d'autres comptes. Un serveur qui exige une connexion pour lire les profils ne peut pas être suivi. Les messages supprimés gardent leur copie avec le statut « supprimé » (question ouverte Q5 de la spec).
 - Aucune configuration de secret n'est nécessaire pour Bluesky et Mastodon.
 
+## Médias identiques
+
+Quand un créateur republie une image déjà archivée (même adresse, ou même fichier sous une autre adresse), memento ne la stocke pas une seconde fois : le média est relié à l'original et sert son fichier. La galerie marque « Doublon » les publications faites uniquement de doublons, signale le lien dans la visionneuse, et le bouton « Masquer les doublons » les retire de la liste. Les doublons ne comptent pas parmi les médias non consultés. La reconnaissance est exacte : une image recompressée ou redimensionnée n'est pas reconnue (la reconnaissance visuelle de memento-local exige un module natif qu'un Worker ne peut pas exécuter).
+
+Pour relier les doublons archivés avant cette fonction, ouvrir la galerie, puis la console des outils de développement :
+
+```js
+// Simulation : doublons trouvés, octets libérables, exemples. Rien n'est écrit.
+await (await fetch("/api/admin/dedupe", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json();
+// Application, par lots de 8, jusqu'à la fin.
+for (let r; !r || r.remaining > 0; ) {
+  r = await (await fetch("/api/admin/dedupe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ apply: true }) })).json();
+  console.log(r);
+  if (r.linked === 0) break;
+}
+```
+
+Ajouter `"creator": "<id>"` au corps pour se limiter à un créateur. Une sauvegarde (rclone, ci-dessous) est conseillée avant l'application.
+
 ## Synchronisation manuelle
 
 En plus de la collecte planifiée (toutes les 15 minutes), le bouton **Synchroniser maintenant** de la page « Créateurs » collecte un seul créateur actif sans attendre le prochain passage. Il suit les mêmes règles que la collecte planifiée (curseur, budget de sous-requêtes, quotas, aucun doublon) et enchaîne les appels avec la progression affichée, jusqu'à ce que le curseur soit rejoint.

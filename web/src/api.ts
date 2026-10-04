@@ -44,6 +44,8 @@ export const api = {
       if (v === true) q.set(k, "1");
       else if (typeof v === "string" && v) q.set(k, v);
     }
+    q.delete("hideDuplicates"); // l'API le nomme `duplicates=hide`
+    if (filters.hideDuplicates) q.set("duplicates", "hide");
     if (cursor) q.set("cursor", cursor);
     return request<{ posts: Post[]; nextCursor: string | null }>(`/posts?${q.toString()}`);
   },

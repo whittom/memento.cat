@@ -110,6 +110,31 @@ Au-delà de l'archivage, memento est une alternative simple au « doomscrolling 
 1. LE SYSTÈME DOIT pouvoir s'exécuter localement (`wrangler dev`) avec le même code qu'en production.
 2. LE SYSTÈME DOIT offrir une exportation complète de l'archive (médias et `post.json`) vers un dossier local.
 
+## Exigence 9 — Médias identiques
+**Récit :** En tant qu'utilisateur, je ne veux pas revoir ni stocker deux fois la même image republiée par un créateur.
+
+Reprise de l'exigence L10 de memento-local (2026-10-03), limitée à ce qui s'exécute dans un Worker : la reconnaissance est **exacte** (adresse, ou empreinte MD5 et taille). La reconnaissance visuelle des quasi-doublons de memento-local (L10.10 et L10.11) n'est pas reprise : elle décode les images avec un module natif (`sharp`) qu'un Worker ne peut pas charger, et dépasserait la limite de temps processeur du plan gratuit.
+
+1. LE SYSTÈME DOIT reconnaître qu'un média est identique à un média déjà archivé **du même créateur**, jamais d'un autre créateur :
+   - avant de le télécharger, quand son adresse source est celle d'un original ;
+   - après l'avoir téléchargé, quand son empreinte MD5 (calculée par R2) et sa taille sont celles d'un original de même genre.
+2. QUAND un média est identique, LE SYSTÈME NE DOIT PAS conserver un second fichier. La publication est archivée normalement, avec ses autres médias ; la ligne du média identique est **liée** à l'original (publication et position) et se sert de ses fichiers (média et miniature). Un fichier déjà écrit pour un doublon reconnu après téléchargement DOIT être supprimé.
+3. LA reconnaissance DOIT se faire média par média : dans un groupe, seul le média identique est lié.
+4. UN doublon n'est jamais l'original d'un autre : tous pointent vers le premier média archivé. Un média non téléchargé n'est jamais un original.
+5. LE lien DOIT survivre à la reconstruction de l'index (il est écrit dans `post.json`). LE SYSTÈME NE DOIT PAS supprimer un fichier encore utilisé par un autre média : avant d'effacer une publication dont un média sert d'original (exigence 5.5), il recopie ses fichiers chez le premier doublon, qui devient l'original des autres.
+6. LA galerie DOIT :
+   - signaler dans la visionneuse qu'un média est identique à celui d'une autre publication, avec un lien vers elle ;
+   - signaler sur la tuile une publication dont tous les médias sont des doublons (badge « Doublon », visible autrement que par la seule couleur) ;
+   - offrir un bouton à bascule « Masquer les doublons » (`aria-pressed`, synchronisé avec l'URL par `duplicates=hide`) qui retire de la liste les publications dont tous les médias sont des doublons. Sans lui, tout reste visible.
+7. LES doublons NE DOIVENT PAS compter parmi les médias non consultés (compteurs et filtre « Non consultés seulement »), ni dans la taille archivée d'un créateur.
+8. LE journal DOIT noter chaque média reconnu comme identique (publication, position, original).
+9. LE SYSTÈME DOIT offrir un rattrapage qui relie les doublons déjà présents dans l'archive, par lots (`POST /api/admin/dedupe`) :
+   - par défaut, il **simule** : il renvoie les doublons trouvés, l'espace libérable et des exemples, sans rien écrire ; `{"apply": true}` applique un lot, à rappeler jusqu'à `remaining = 0` ;
+   - il ne compare que le contenu (genre, empreinte et taille identiques, au sein d'un même créateur) ;
+   - l'original est le premier média archivé (ordre de la fiche, puis position) dont le fichier existe ; jamais de chaîne ;
+   - il écrit `post.json` avant la base et ne supprime les fichiers en double qu'après : une interruption laisse une archive cohérente, et l'appel suivant termine le travail ;
+   - il peut être limité à un créateur (`{"creator": "<id>"}`).
+
 ## Questions ouvertes
 - **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1. Reprise le 2026-10-01 : la purge est implémentée (exigence 5.5), ce qui supprime l'écart avec les conditions Reddit. Reste la fréquence : la vérification est à la demande (exigence 5.2) et Reddit recommande de supprimer sous 48 heures ; tant qu'aucune vérification n'est lancée, une publication supprimée à la source reste dans l'archive. Option à évaluer si Reddit l'exige : vérification planifiée limitée à Reddit.
 - **Q2 — Bluesky et le contenu supprimé.** Vérifier dans les conditions développeur de Bluesky si la conservation d'une publication supprimée est permise. Le choix de ne pas purger s'applique aussi à Bluesky en v1.

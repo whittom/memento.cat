@@ -44,6 +44,8 @@ export interface PostListRow extends PostRow {
   display_name: string | null;
   media_count: number;
   unviewed_count: number;
+  /** Nombre de médias liés à un original (doublons). */
+  duplicate_count: number;
   /** Numéro d'inventaire : rowid de posts, croissant à l'archivage (renuméroté par une reconstruction d'index). */
   catalog_no: number;
 }
@@ -65,9 +67,17 @@ export interface MediaRow {
   source_url: string;
   downloaded: number;
   viewed_at: string | null;
+  /** Média identique à un original du même créateur : publication et position de cet original (exigence 9). */
+  duplicate_post_id: string | null;
+  duplicate_position: number | null;
 }
 
-export type MediaInsert = Omit<MediaRow, "viewed_at">;
+/** Ligne de média à insérer ; le lien vers un original est facultatif (nul par défaut). */
+export type MediaInsert = Omit<MediaRow, "viewed_at" | "duplicate_post_id" | "duplicate_position"> &
+  Partial<Pick<MediaRow, "duplicate_post_id" | "duplicate_position">>;
+
+/** Médias non consultés qui comptent : téléchargés, et qui ne sont pas des doublons (exigence 9.7). */
+const UNVIEWED = "m.viewed_at IS NULL AND m.downloaded = 1 AND m.duplicate_post_id IS NULL";
 
 const VISIBLE = "c.state IN ('active', 'paused')";
 
@@ -79,7 +89,7 @@ export async function listCreators(db: D1Database): Promise<CreatorWithCounts[]>
       `SELECT c.*,
          (SELECT COUNT(*) FROM posts p WHERE p.creator_id = c.id) AS post_count,
          (SELECT COUNT(*) FROM media m JOIN posts p ON p.id = m.post_id
-            WHERE p.creator_id = c.id AND m.viewed_at IS NULL AND m.downloaded = 1) AS unviewed_count
+            WHERE p.creator_id = c.id AND ${UNVIEWED}) AS unviewed_count
        FROM creators c
        ORDER BY c.handle COLLATE NOCASE`,
     )
@@ -177,7 +187,7 @@ export async function creatorStats(
       `SELECT
          (SELECT COUNT(*) FROM posts WHERE creator_id = ?1) AS posts,
          (SELECT COUNT(*) FROM media m JOIN posts p ON p.id = m.post_id WHERE p.creator_id = ?1) AS media,
-         (SELECT COALESCE(SUM(m.bytes), 0) FROM media m JOIN posts p ON p.id = m.post_id WHERE p.creator_id = ?1) AS bytes`,
+         (SELECT COALESCE(SUM(m.bytes), 0) FROM media m JOIN posts p ON p.id = m.post_id WHERE p.creator_id = ?1 AND m.duplicate_post_id IS NULL) AS bytes`,
     )
     .bind(id)
     .first<{ posts: number; media: number; bytes: number }>();
@@ -220,12 +230,14 @@ export async function insertPost(
         .prepare(
           `INSERT OR IGNORE INTO media
              (post_id, position, kind, mime_type, r2_key, etag, bytes, width, height,
-              thumb_r2_key, thumb_width, thumb_height, description, source_url, downloaded)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              thumb_r2_key, thumb_width, thumb_height, description, source_url, downloaded,
+              duplicate_post_id, duplicate_position)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           m.post_id, m.position, m.kind, m.mime_type, m.r2_key, m.etag, m.bytes, m.width, m.height,
           m.thumb_r2_key, m.thumb_width, m.thumb_height, m.description, m.source_url, m.downloaded,
+          m.duplicate_post_id ?? null, m.duplicate_position ?? null,
         ),
     ),
   ];
@@ -240,6 +252,8 @@ export interface PostFilters {
   q?: string;
   status?: "active" | "deleted";
   unviewed?: boolean;
+  /** Retire les publications dont tous les médias sont des doublons (exigence 9.6). */
+  hideDuplicates?: boolean;
   cursor?: { publishedAt: string; id: string };
   limit: number;
 }
@@ -263,7 +277,13 @@ export async function listPosts(db: D1Database, f: PostFilters): Promise<PostLis
   if (f.to) { where.push("p.published_at < ?"); params.push(f.to); }
   if (f.status) { where.push("p.status = ?"); params.push(f.status); }
   if (f.unviewed) {
-    where.push("EXISTS (SELECT 1 FROM media m WHERE m.post_id = p.id AND m.viewed_at IS NULL AND m.downloaded = 1)");
+    where.push(`EXISTS (SELECT 1 FROM media m WHERE m.post_id = p.id AND ${UNVIEWED})`);
+  }
+  if (f.hideDuplicates) {
+    where.push(
+      `(NOT EXISTS (SELECT 1 FROM media m WHERE m.post_id = p.id)
+        OR EXISTS (SELECT 1 FROM media m WHERE m.post_id = p.id AND m.duplicate_post_id IS NULL))`,
+    );
   }
   const fts = f.q ? toFtsQuery(f.q) : null;
   if (fts) { where.push("p.id IN (SELECT post_id FROM posts_fts WHERE posts_fts MATCH ?)"); params.push(fts); }
@@ -277,7 +297,8 @@ export async function listPosts(db: D1Database, f: PostFilters): Promise<PostLis
     .prepare(
       `SELECT p.*, p.rowid AS catalog_no, c.platform, c.handle, c.display_name,
          (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id) AS media_count,
-         (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND m.viewed_at IS NULL AND m.downloaded = 1) AS unviewed_count
+         (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND ${UNVIEWED}) AS unviewed_count,
+         (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND m.duplicate_post_id IS NOT NULL) AS duplicate_count
        FROM posts p JOIN creators c ON c.id = p.creator_id
        WHERE ${where.join(" AND ")}
        ORDER BY p.published_at DESC, p.id DESC
@@ -293,7 +314,8 @@ export async function getVisiblePost(db: D1Database, id: string): Promise<PostLi
     .prepare(
       `SELECT p.*, p.rowid AS catalog_no, c.platform, c.handle, c.display_name,
          (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id) AS media_count,
-         (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND m.viewed_at IS NULL AND m.downloaded = 1) AS unviewed_count
+         (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND ${UNVIEWED}) AS unviewed_count,
+         (SELECT COUNT(*) FROM media m WHERE m.post_id = p.id AND m.duplicate_post_id IS NOT NULL) AS duplicate_count
        FROM posts p JOIN creators c ON c.id = p.creator_id
        WHERE p.id = ? AND ${VISIBLE}`,
     )
@@ -309,6 +331,141 @@ export async function mediaForPosts(db: D1Database, postIds: string[]): Promise<
     .bind(...postIds)
     .all<MediaRow>();
   return results;
+}
+
+/** Ce qui identifie un média pour la reconnaissance des doublons (exigence 9.1). */
+export interface MediaProbe {
+  kind: MediaRow["kind"];
+  sourceUrl: string;
+  /** Empreinte MD5 (calculée par R2) et taille du fichier téléchargé ; absentes avant le téléchargement. */
+  etag?: string | null;
+  bytes?: number | null;
+}
+
+/** Les champs d'un original que recopie un doublon : fichiers, mesures et lien. */
+export type OriginalOf = Pick<
+  MediaRow,
+  "post_id" | "position" | "mime_type" | "r2_key" | "etag" | "bytes" | "width" | "height" | "thumb_r2_key" | "thumb_width" | "thumb_height"
+>;
+
+const isOriginal = (m: Pick<MediaInsert, "downloaded" | "r2_key" | "duplicate_post_id">) =>
+  m.downloaded === 1 && m.r2_key !== null && (m.duplicate_post_id ?? null) === null;
+
+/**
+ * Original d'un média : un média déjà archivé **du même créateur**, téléchargé et qui n'est pas lui-même
+ * un doublon, dont l'adresse source est la même, ou dont l'empreinte et la taille sont les mêmes
+ * (exigence 9.1). `pending` : les lignes de la publication en cours, pas encore en base.
+ * Au plus deux requêtes D1 (par adresse, puis par contenu).
+ */
+export async function findOriginal(
+  db: D1Database,
+  creatorId: string,
+  probe: MediaProbe,
+  pending: MediaInsert[] = [],
+): Promise<OriginalOf | null> {
+  const matches = (m: { kind: string; source_url: string; etag: string | null; bytes: number | null }) =>
+    m.source_url === probe.sourceUrl || (probe.etag != null && m.etag === probe.etag && m.bytes === (probe.bytes ?? null) && m.kind === probe.kind);
+
+  const local = pending.find((m) => isOriginal(m) && matches(m));
+  if (local) return local;
+
+  const columns = "m.post_id, m.position, m.mime_type, m.r2_key, m.etag, m.bytes, m.width, m.height, m.thumb_r2_key, m.thumb_width, m.thumb_height";
+  const base = `SELECT ${columns} FROM media m JOIN posts p ON p.id = m.post_id
+     WHERE p.creator_id = ? AND m.downloaded = 1 AND m.r2_key IS NOT NULL AND m.duplicate_post_id IS NULL`;
+  const order = "ORDER BY p.rowid, m.position LIMIT 1";
+  if (probe.etag == null || probe.bytes == null) {
+    return db.prepare(`${base} AND m.source_url = ? ${order}`).bind(creatorId, probe.sourceUrl).first<OriginalOf>();
+  }
+  return db
+    .prepare(`${base} AND m.etag = ? AND m.bytes = ? AND m.kind = ? ${order}`)
+    .bind(creatorId, probe.etag, probe.bytes, probe.kind)
+    .first<OriginalOf>();
+}
+
+/** Vrai si un média d'une autre publication se sert encore de ce fichier (média ou miniature). */
+export async function keyInUseElsewhere(db: D1Database, key: string, postId: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT 1 AS x FROM media WHERE post_id != ?1 AND (r2_key = ?2 OR thumb_r2_key = ?2) LIMIT 1")
+    .bind(postId, key)
+    .first<{ x: number }>();
+  return row !== null;
+}
+
+/** Médias d'autres publications liés aux publications données (ils perdraient leur original). */
+export async function dependentsOf(db: D1Database, postIds: string[]): Promise<Pick<MediaRow, "post_id" | "position" | "duplicate_post_id" | "duplicate_position">[]> {
+  if (postIds.length === 0) return [];
+  const placeholders = postIds.map(() => "?").join(", ");
+  const { results } = await db
+    .prepare(
+      `SELECT post_id, position, duplicate_post_id, duplicate_position FROM media
+       WHERE duplicate_post_id IN (${placeholders}) AND post_id NOT IN (${placeholders})`,
+    )
+    .bind(...postIds, ...postIds)
+    .all<Pick<MediaRow, "post_id" | "position" | "duplicate_post_id" | "duplicate_position">>();
+  return results;
+}
+
+/** Candidats au rattrapage : médias téléchargés, non liés, avec empreinte et taille, dans l'ordre d'archivage. */
+export interface DedupeCandidate {
+  creator_id: string;
+  post_id: string;
+  position: number;
+  kind: MediaRow["kind"];
+  r2_key: string;
+  thumb_r2_key: string | null;
+  r2_prefix: string;
+  etag: string;
+  bytes: number;
+}
+
+export async function dedupeCandidates(db: D1Database, creatorId?: string): Promise<DedupeCandidate[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.creator_id, m.post_id, m.position, m.kind, m.r2_key, m.thumb_r2_key, p.r2_prefix, m.etag, m.bytes
+       FROM media m JOIN posts p ON p.id = m.post_id
+       WHERE m.downloaded = 1 AND m.r2_key IS NOT NULL AND m.duplicate_post_id IS NULL
+         AND m.etag IS NOT NULL AND m.bytes IS NOT NULL AND (?1 IS NULL OR p.creator_id = ?1)
+         AND EXISTS (SELECT 1 FROM media m2 JOIN posts p2 ON p2.id = m2.post_id
+                     WHERE p2.creator_id = p.creator_id AND m2.etag = m.etag AND m2.bytes = m.bytes AND m2.kind = m.kind
+                       AND m2.downloaded = 1 AND m2.duplicate_post_id IS NULL
+                       AND (m2.post_id != m.post_id OR m2.position != m.position))
+       ORDER BY p.creator_id, p.rowid, m.position`,
+    )
+    .bind(creatorId ?? null)
+    .all<DedupeCandidate>();
+  return results;
+}
+
+/** Relie un média à son original : il recopie ses fichiers et ses mesures (consultation et légende conservées). */
+export async function linkMedia(db: D1Database, postId: string, position: number, original: OriginalOf): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE media SET mime_type = ?, r2_key = ?, etag = ?, bytes = ?, width = ?, height = ?,
+         thumb_r2_key = ?, thumb_width = ?, thumb_height = ?, downloaded = 1,
+         duplicate_post_id = ?, duplicate_position = ?
+       WHERE post_id = ? AND position = ?`,
+    )
+    .bind(
+      original.mime_type, original.r2_key, original.etag, original.bytes, original.width, original.height,
+      original.thumb_r2_key, original.thumb_width, original.thumb_height, original.post_id, original.position,
+      postId, position,
+    )
+    .run();
+}
+
+/** Le média (fichiers et mesures) qui sert d'original. */
+export async function getMedia(db: D1Database, postId: string, position: number): Promise<MediaRow | null> {
+  return db.prepare("SELECT * FROM media WHERE post_id = ? AND position = ?").bind(postId, position).first<MediaRow>();
+}
+
+/** Retire le lien : le média garde les fichiers et devient un original (son original a été effacé). */
+export async function unlinkMedia(db: D1Database, rows: Pick<MediaRow, "post_id" | "position">[]): Promise<void> {
+  if (rows.length === 0) return;
+  await db.batch(
+    rows.map((r) =>
+      db.prepare("UPDATE media SET duplicate_post_id = NULL, duplicate_position = NULL WHERE post_id = ? AND position = ?").bind(r.post_id, r.position),
+    ),
+  );
 }
 
 /** Vrai si la clé R2 appartient à une publication visible (un média masqué n'est pas servi). */

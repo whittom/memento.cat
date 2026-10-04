@@ -49,6 +49,8 @@ export async function reindexBatch(env: Env, cursor: string | undefined): Promis
     const media: MediaInsert[] = arr(data["media"]).map((m, position) => {
       const o = obj(m) ?? {};
       const kind = str(o["kind"]);
+      const duplicateOf = obj(o["duplicateOf"]);
+      const originalPost = str(duplicateOf?.["postId"]);
       return {
         post_id: id,
         position,
@@ -65,6 +67,8 @@ export async function reindexBatch(env: Env, cursor: string | undefined): Promis
         description: str(o["description"]) ?? null,
         source_url: str(o["sourceUrl"]) ?? "",
         downloaded: bool(o["downloaded"]) ? 1 : 0,
+        duplicate_post_id: originalPost ?? null,
+        duplicate_position: originalPost ? (num(duplicateOf?.["position"]) ?? 0) : null,
       };
     });
     await insertPost(env.DB, post, prefix, media, capturedAt);

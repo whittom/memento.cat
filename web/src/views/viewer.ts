@@ -180,6 +180,16 @@ export function openViewer(opts: ViewerOptions): Viewer {
         h("dt", {}, "Archivée"),
         h("dd", {}, fmtDateTime(post.capturedAt)),
       ),
+      media?.duplicateOf
+        ? h(
+            "p",
+            { class: "viewer-duplicate", role: "note" },
+            h("strong", {}, "Doublon. "),
+            "Ce média est identique à un média déjà archivé de ce créateur : ",
+            h("a", { href: `/publication/${encodeURIComponent(media.duplicateOf.postId)}?media=${media.duplicateOf.position}`, "data-link": true }, "voir l'original"),
+            ".",
+          )
+        : null,
       h("a", { class: "viewer-source", href: post.sourceUrl, target: "_blank", rel: "noopener noreferrer" }, "Voir sur ", platformLabel(post.creator.platform), svgIcon("external")),
     );
 

@@ -231,6 +231,7 @@ main:focus { outline: none; }
   background: var(--graphite); color: var(--sheet);
 }
 .badge-deleted { background: var(--sheet); color: var(--amber); outline: 1.5px solid var(--amber); }
+.badge-duplicate { background: var(--sheet); color: var(--graphite); outline: 1.5px solid var(--graphite); }
 .icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .badge-kind .icon { fill: currentColor; stroke: none; }
 
@@ -400,6 +401,8 @@ main:focus { outline: none; }
 .viewer-meta dt { color: #aeb7bd; }
 .viewer-meta dd { margin: 0; }
 .viewer-source { display: inline-flex; align-items: center; gap: 0.35rem; }
+.viewer-duplicate { margin: 0.75rem 0; padding: 0.6rem 0.75rem; border: 1.5px solid currentColor; border-radius: 8px; font-size: var(--step--1); }
+.viewer-duplicate a { color: inherit; text-decoration: underline; }
 .notice-deleted { color: #f0c38a; }
 .viewer-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .viewer-actions .btn { background: transparent; color: var(--on-loupe); border-color: #5b646b; }

@@ -20,6 +20,7 @@ import {
   type CreatorRow,
   type CreatorWithCounts,
 } from "../storage/db";
+import { dedupeBatch } from "../dedupe";
 import { verifyBatch } from "../verify";
 import { decodeCursor, encodeCursor, json, parseDay, readBody } from "./http";
 import { presentPost } from "./present";
@@ -178,6 +179,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       q: q.get("q")?.slice(0, 200) ?? undefined,
       status: status === "active" || status === "deleted" ? status : undefined,
       unviewed: q.get("unviewed") === "1",
+      hideDuplicates: q.get("duplicates") === "hide",
       cursor: decodeCursor(q.get("cursor")),
       limit: PAGE_SIZE + 1,
     });
@@ -207,6 +209,11 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   if (parts[0] === "admin" && parts[1] === "reindex" && method === "POST") {
     const body = await readBody(request);
     return json(await reindexBatch(env, str(body["cursor"])));
+  }
+
+  if (parts[0] === "admin" && parts[1] === "dedupe" && method === "POST") {
+    const body = await readBody(request);
+    return json(await dedupeBatch(env, { apply: bool(body["apply"]), creatorId: str(body["creator"]) }));
   }
 
   throw new HttpError(404, "Route inconnue");

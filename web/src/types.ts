@@ -29,6 +29,8 @@ export interface Media {
   downloaded: boolean;
   viewed: boolean;
   sourceUrl: string;
+  /** Média identique à celui d'une autre publication du même créateur (l'original). */
+  duplicateOf: { postId: string; position: number } | null;
 }
 
 export interface Post {
@@ -45,6 +47,9 @@ export interface Post {
   deletedSeenAt: string | null;
   mediaCount: number;
   unviewedCount: number;
+  /** Tous les médias de la publication sont des doublons. */
+  duplicate: boolean;
+  duplicateCount: number;
   media: Media[];
 }
 
@@ -56,4 +61,6 @@ export interface Filters {
   q?: string;
   status?: string;
   unviewed?: boolean;
+  /** Retire les publications faites uniquement de doublons. */
+  hideDuplicates?: boolean;
 }

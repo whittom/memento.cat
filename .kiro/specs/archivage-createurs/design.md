@@ -213,6 +213,19 @@ SPA Vite en TypeScript, servie par Workers Static Assets. Écrans : liste filtra
 - Identifiants Reddit en secrets Wrangler.
 - Aucune route publique.
 
+## Médias identiques (exigence 9)
+Repris de memento-local (§ 19 de sa conception), adapté au Worker : liaisons D1 et R2 seulement, aucune sous-requête externe supplémentaire, aucun décodage d'image.
+
+- **Migration `0004_medias_identiques.sql` :** `media.duplicate_post_id` et `media.duplicate_position` (nuls ou renseignés ensemble), index sur le lien, sur `etag` et sur `source_url`. Pas de clé étrangère : le lien ne sort jamais du créateur, dont l'effacement emporte originaux et doublons.
+- **Principe :** un doublon est une ligne `media` qui recopie les clés et mesures de l'original (`r2_key`, `thumb_r2_key`, `etag`, `bytes`, dimensions, `downloaded = 1`) et ajoute le lien. La route des médias et la visionneuse n'ont rien à changer pour l'afficher.
+- **Archivage (`archivePost`) :** pour chaque média, `findOriginal` cherche d'abord par adresse (aucun téléchargement si trouvé), puis, après le téléchargement, par empreinte MD5 et taille (le fichier écrit est alors supprimé de R2). Les lignes déjà prêtes de la même publication comptent. Au plus deux requêtes D1 de plus par média : `queriesNeeded` passe à `1 + 3 + 3 × médias + 2`.
+- **Décomptes :** `duplicate_post_id IS NULL` s'ajoute aux médias non consultés (créateurs, publications, filtre) et aux octets de `creatorStats`.
+- **API :** chaque média présenté porte `duplicateOf: { postId, position } | null` ; chaque publication `duplicate` (au moins un média, tous liés) et `duplicateCount`. `GET /api/posts?duplicates=hide` retire les publications faites uniquement de doublons.
+- **`post.json` :** chaque média porte `duplicateOf` ; `reindexBatch` le relit.
+- **Effacement d'une publication (`purgePosts`, vérification Reddit) :** `rehomeDependents` recopie (R2 `get` puis `put`) les fichiers d'un original chez son premier doublon d'une autre publication, qui devient original ; les autres doublons lui sont reliés, `post.json` compris. L'effacement d'un créateur entier s'en dispense.
+- **Rattrapage (`src/dedupe/`, `POST /api/admin/dedupe`) :** le plan (une requête D1, puis un `head` R2 par original candidat) relie, par créateur, les médias de même genre, empreinte et taille au premier archivé dont le fichier existe. Chaque appel avec `apply` relie au plus 8 doublons (environ 4 requêtes D1 et 4 opérations R2 chacun, sous la limite de 50 requêtes D1 du plan gratuit) et recalcule le plan à l'appel suivant.
+- **Non repris de memento-local :** les empreintes visuelles (quasi-doublons), qui exigent `sharp` ; la complétion par capture, absente de memento.cat.
+
 ## Erreurs et observabilité
 - Classes d'erreur typées par cause (quota, introuvable, plateforme).
 - Journaux JSON structurés par créateur et par exécution ; observabilité Workers activée.

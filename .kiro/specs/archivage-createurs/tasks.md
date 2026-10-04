@@ -88,6 +88,15 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] P.5 Wrangler 4.146 (corrige trois vulnérabilités de dépendances de développement : undici, miniflare, wrangler) et workflow `verify.yml` qui vérifie chaque pull request, dont celles de Dependabot (livré en `v0.1.16`).
 - [x] P.6 Réglages de sécurité GitHub : dépôt public, analyse des secrets et protection des envois, signalement privé de vulnérabilités, CodeQL (configuration par défaut), alertes et correctifs Dependabot groupés. Mention de droits d'auteur de `LICENSE.md` confirmée.
 
+## Médias identiques (repris de memento-local le 2026-10-03)
+- [x] 9.1 Migration `0004_medias_identiques.sql` et couche de données : `findOriginal`, `keyInUseElsewhere`, insertion du lien, décomptes sans doublons, filtre `hideDuplicates`. _Exig. 9.1, 9.4, 9.7_
+- [x] 9.2 Archivage : reconnaissance avant et après téléchargement, fichier en double supprimé, `post.json` (`duplicateOf`), journal, budget D1 ajusté. _Exig. 9.1 à 9.4, 9.8_
+- [x] 9.3 Reconstruction de l'index et relogement des doublons avant l'effacement d'une publication. _Exig. 9.5_
+- [x] 9.4 API (`duplicateOf`, `duplicate`, `duplicates=hide`) et galerie (badge, note dans la visionneuse, bouton « Masquer les doublons »). _Exig. 9.6_
+- [x] 9.5 Rattrapage par lots `POST /api/admin/dedupe` (simulation par défaut). _Exig. 9.9_
+- [x] 9.6 Tests sur une vraie base SQLite (migrations du dépôt) et un faux R2 : `test/duplicates.test.ts`.
+- [ ] 9.7 Appliquer la migration 0004 en production et lancer le rattrapage (simulation, puis application).
+
 ## Phase 6 — Mise en service → `v1.0`
 - [x] 6.1 Cloudflare Access devant la galerie et l'API (application auto-hébergée sur le domaine, politique limitée au propriétaire) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
 - [ ] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, à faire.

@@ -19,6 +19,9 @@ export function presentPost(row: PostListRow, media: MediaRow[]) {
     deletedSeenAt: row.deleted_seen_at,
     mediaCount: row.media_count,
     unviewedCount: row.unviewed_count,
+    duplicateCount: row.duplicate_count,
+    /** Tous les médias de la publication sont des doublons (au moins un). */
+    duplicate: row.media_count > 0 && row.duplicate_count === row.media_count,
     media: media.map((m) => ({
       position: m.position,
       kind: m.kind,
@@ -33,6 +36,7 @@ export function presentPost(row: PostListRow, media: MediaRow[]) {
       downloaded: m.downloaded === 1,
       viewed: m.viewed_at !== null,
       sourceUrl: m.source_url,
+      duplicateOf: m.duplicate_post_id ? { postId: m.duplicate_post_id, position: m.duplicate_position ?? 0 } : null,
     })),
   };
 }
