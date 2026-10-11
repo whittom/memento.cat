@@ -113,7 +113,7 @@ Au-delà de l'archivage, memento est une alternative simple au « doomscrolling 
 ## Exigence 9 — Médias identiques
 **Récit :** En tant qu'utilisateur, je ne veux pas revoir ni stocker deux fois la même image republiée par un créateur.
 
-Reprise de l'exigence L10 de memento-local (2026-10-03), limitée à ce qui s'exécute dans un Worker : la reconnaissance est **exacte** (adresse, ou empreinte MD5 et taille). La reconnaissance visuelle des quasi-doublons de memento-local (L10.10 et L10.11) n'est pas reprise : elle décode les images avec un module natif (`sharp`) qu'un Worker ne peut pas charger, et dépasserait la limite de temps processeur du plan gratuit.
+Reprise de l'exigence L10 de memento-local (2026-10-03). La reconnaissance exacte (adresse, ou empreinte MD5 et taille) est faite dans le Worker. La reconnaissance visuelle des quasi-doublons (9.11, reprise le 2026-10-11 de L10.10 à L10.13) passe par la liaison Cloudflare Images, qui rend des pixels bruts : memento-local utilise `sharp`, qu'un Worker ne peut pas charger.
 
 1. LE SYSTÈME DOIT reconnaître qu'un média est identique à un média déjà archivé **du même créateur**, jamais d'un autre créateur :
    - avant de le télécharger, quand son adresse source est celle d'un original ;
@@ -136,7 +136,12 @@ Reprise de l'exigence L10 de memento-local (2026-10-03), limitée à ce qui s'ex
    - il peut être limité à un créateur (`{"creator": "<id>"}`).
 10. **Depuis la page Créateurs (reprise de L10.12 de memento-local, 2026-10-11) :** LA page Créateurs DOIT offrir, pour chaque créateur suivi (actif ou désactivé), « Supprimer les doublons… » : une simulation (médias à relier, fiches entièrement en double, espace libérable), une confirmation dans une fenêtre de la page, puis le ménage de ce créateur seulement, avec sa progression et son bilan. Route `POST /api/creators/<id>/duplicates` (`{ apply }`), par lots, rappelée par la galerie jusqu'à la fin.
     - **Seule la première occurrence d'un média est conservée** : les fiches dont **tous** les médias sont des doublons (déjà reliés, ou que ce ménage relie) sont **supprimées définitivement** (fichiers propres, index, publication). Une galerie qui garde au moins un média propre reste entière, doublons liés compris. Une fiche dont un fichier sert à une autre est conservée.
-    - Comme pour le reste de l'exigence 9, seules les copies identiques sont reconnues : pas de quasi-doublons.
+    - Le ménage relie aussi les quasi-doublons (9.11) ; dans un groupe de quasi-doublons, la meilleure image (le plus de pixels, puis d'octets) est gardée, pas forcément la première.
+11. **Quasi-doublons (reprise de L10.10, L10.11 et L10.13 de memento-local, 2026-10-11) :** une même image archivée sous des encodages différents (recompression, redimensionnement) DOIT être reconnue, au sein d'un même créateur, par une **empreinte visuelle** (image réduite à 17 × 16 en niveaux de gris, comparaison de chaque pixel à son voisin, 256 bits), conservée en base (colonne `fingerprint`).
+    - **À l'archivage :** QUAND une image téléchargée n'est pas une copie identique, LE SYSTÈME DOIT la comparer aux originaux du créateur qui ont déjà une empreinte ; si l'écart est d'au plus `VISUAL_DEDUPE_THRESHOLD` bits (6 par défaut, 0 désactive), que le rapport largeur/hauteur est le même à 2 % près et que l'original a au moins autant de pixels, ALORS elle est reliée comme un doublon (9.2 : fichier en double supprimé, journal avec l'écart).
+    - **Second regard :** QUAND l'écart est au-dessus du seuil mais d'au plus **24 bits**, LE SYSTÈME DOIT comparer les deux images pixel à pixel (48 × 48, niveaux de gris) et les tenir pour la même image si l'écart moyen est d'au plus **6** sur 255. Au plus 3 seconds regards par image archivée, 30 par plan de ménage.
+    - **Ménage (9.10) :** il calcule d'abord, par lots, les empreintes manquantes des images du créateur (celles de l'archive existante), puis compare chaque image aux seuls originaux de groupe (jamais de proche en proche). Un doublon déjà relié à une image qui cesse d'être l'original est relié à la nouvelle.
+    - Une image illisible, quasi unie, animée (GIF), un SVG, une image de plus de 20 Mo ou une vidéo n'est jamais comparée. Sans la liaison Images, ou quand son quota est atteint, seules les copies identiques sont reconnues, sans erreur.
 
 ## Exigence 10 — Miniatures fabriquées
 **Récit :** En tant qu'utilisateur, je veux que la galerie charge de petites images, pas les originaux de plusieurs mégaoctets.

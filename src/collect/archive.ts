@@ -7,6 +7,8 @@ import { findOriginal, insertPost, type MediaInsert, type OriginalOf } from "../
 import { extensionFor, mediaKey, postJsonKey, postPrefix, thumbKey } from "../storage/keys";
 import { putJson, storeRemoteFile } from "../storage/r2";
 import { makeThumbnail } from "../storage/thumbnail";
+import { canAnalyse, dimensionsOf, fingerprintOf, toHex, type ImageSource } from "../dedupe/fingerprint";
+import { findSimilarOriginal } from "../dedupe/similar";
 
 const MAX_THUMB_BYTES = 5 * 1024 * 1024;
 
@@ -16,11 +18,11 @@ export function fetchesNeeded(post: NormalizedPost): number {
 }
 
 /**
- * Requêtes D1 : existence, insertion (3 + une par média), reconnaissance des doublons (au plus deux par
- * média : par adresse, puis par contenu), curseur, plus une réserve pour le bilan du créateur.
+ * Requêtes D1 : existence, insertion (3 + une par média), reconnaissance des doublons (au plus trois par
+ * média : par adresse, par contenu, puis visuelle), curseur, plus une réserve pour le bilan du créateur.
  */
 export function queriesNeeded(post: NormalizedPost): number {
-  return 1 + 3 + post.media.length * 3 + 1 + 1;
+  return 1 + 3 + post.media.length * 4 + 1 + 1;
 }
 
 /** La ligne d'un doublon : elle se sert des fichiers et des mesures de l'original et garde le lien (exigence 9.2). */
@@ -104,6 +106,26 @@ export async function archivePost(
           await env.MEDIA.delete(full.key);
           identical(byContent, "contenu");
           continue;
+        }
+        // Même image, autre encodage (exigence 9.11) : reconnue par empreinte, puis au besoin pixel à pixel.
+        const source: ImageSource = { images: env.IMAGES, bucket: env.MEDIA, key: full.key, mimeType: full.mimeType, bytes: full.bytes };
+        if (m.kind === "image" && config.visualDedupeThreshold > 0 && canAnalyse(source)) {
+          const dims = row.width && row.height ? { width: row.width, height: row.height } : await dimensionsOf(source);
+          if (dims) {
+            row.width = dims.width;
+            row.height = dims.height;
+          }
+          const print = await fingerprintOf(source);
+          const similar = print && dims
+            ? await findSimilarOriginal(db, post.creatorId, print, dims, config.visualDedupeThreshold, rows, source)
+            : null;
+          if (similar) {
+            await env.MEDIA.delete(full.key);
+            log.info("média visuellement identique", { post: post.id, position, original: `${similar.original.post_id}#${similar.original.position}`, ecart: similar.bits });
+            rows.push(linkedTo(row, similar.original));
+            continue;
+          }
+          row.fingerprint = print ? toHex(print) : "";
         }
         row.r2_key = full.key;
         row.etag = full.etag;

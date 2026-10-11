@@ -358,7 +358,16 @@ function openDuplicatesDialog(c: Creator, refresh: () => void): void {
   const close = h("button", { type: "button", class: "btn btn-quiet", onclick: () => dialog.close() }, "Annuler");
   let changed = false;
 
-  void api.duplicates(c.id, false).then(
+  // La simulation rappelle l'API tant que des empreintes visuelles restent à calculer (par lots, côté Worker).
+  const simulate = async () => {
+    for (;;) {
+      const plan = await api.duplicates(c.id, false);
+      if (plan.pendingFingerprints === 0) return plan;
+      summary.textContent = `Analyse des images : ${plural(plan.pendingFingerprints, "image restante", "images restantes")}…`;
+    }
+  };
+
+  void simulate().then(
     (plan) => {
       if (plan.done) {
         summary.textContent = "Aucun doublon : chaque média n'apparaît qu'une fois.";
@@ -368,7 +377,7 @@ function openDuplicatesDialog(c: Creator, refresh: () => void): void {
       const parts = [
         plan.postCount > 0 ? `${plural(plan.postCount, "fiche sera supprimée", "fiches seront supprimées")} : toutes ses images sont déjà dans une fiche plus ancienne.` : null,
         plan.count > 0
-          ? `${plural(plan.count, "média en double sera relié", "médias en double seront reliés")} à sa première occurrence, ${fmtBytes(plan.freeableBytes)} libérés.`
+          ? `${plural(plan.count, "média en double sera relié", "médias en double seront reliés")} à sa première occurrence${plan.visualCount > 0 ? ` (dont ${plural(plan.visualCount, "quasi-doublon", "quasi-doublons")} : même image, autre encodage ; la meilleure est gardée)` : ""}, ${fmtBytes(plan.freeableBytes)} libérés.`
           : null,
       ].filter(Boolean);
       summary.textContent = `${parts.join(" ")} Seule la première occurrence de chaque média est conservée. La suppression est définitive.`;
@@ -388,6 +397,10 @@ function openDuplicatesDialog(c: Creator, refresh: () => void): void {
     try {
       for (;;) {
         const r = await api.duplicates(c.id, true);
+        if (r.pendingFingerprints > 0) {
+          result.textContent = `Analyse des images : ${plural(r.pendingFingerprints, "image restante", "images restantes")}…`;
+          continue;
+        }
         linked += r.linked;
         deleted += r.deletedPosts;
         changed = true;

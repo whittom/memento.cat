@@ -10,6 +10,8 @@ export interface Config {
   redditUserAgent: string;
   /** User-Agent envoyé aux serveurs Mastodon : il identifie l'installation auprès de leurs administrateurs. */
   mastodonUserAgent: string;
+  /** Écart d'empreinte maximal (bits sur 256) pour relier un quasi-doublon ; 0 désactive la reconnaissance visuelle. */
+  visualDedupeThreshold: number;
 }
 
 /** Valeur neutre : chaque installation devrait la remplacer par un nom qui la désigne (MASTODON_USER_AGENT). */
@@ -18,6 +20,12 @@ export const DEFAULT_MASTODON_USER_AGENT = "memento (archive personnelle en lect
 function int(value: string | undefined, fallback: number): number {
   const n = Number.parseInt(value ?? "", 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** Seuil des quasi-doublons : 6 par défaut (calibré sur l'archive de memento-local), 0 désactive, 32 au plus. */
+function threshold(value: string | undefined): number {
+  const n = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, 32) : 6;
 }
 
 /** Lit la configuration à partir des variables d'environnement, avec des valeurs par défaut sûres. */
@@ -33,5 +41,6 @@ export function readConfig(env: Env): Config {
     rateLimitFloor: int(env.RATE_LIMIT_FLOOR, 10),
     redditUserAgent: env.REDDIT_USER_AGENT ?? "",
     mastodonUserAgent: env.MASTODON_USER_AGENT || DEFAULT_MASTODON_USER_AGENT,
+    visualDedupeThreshold: threshold(env.VISUAL_DEDUPE_THRESHOLD),
   };
 }

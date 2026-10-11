@@ -8,7 +8,7 @@ import type { CreatorRow } from "../src/storage/db";
 
 const config: Config = {
   requireAccess: false, accessTeamDomain: "", accessAud: "",
-  maxSubrequestsPerRun: 45, maxQueriesPerRun: 40, maxPagesPerCreator: 3, maxMediaBytes: 1, rateLimitFloor: 10, redditUserAgent: "", mastodonUserAgent: "memento (test)",
+  maxSubrequestsPerRun: 45, maxQueriesPerRun: 40, maxPagesPerCreator: 3, maxMediaBytes: 1, rateLimitFloor: 10, redditUserAgent: "", mastodonUserAgent: "memento (test)", visualDedupeThreshold: 0,
 };
 
 const creator = (state: CreatorRow["state"], cursor: string | null = null): CreatorRow => ({

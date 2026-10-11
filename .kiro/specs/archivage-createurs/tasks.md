@@ -96,6 +96,7 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 9.5 Rattrapage par lots `POST /api/admin/dedupe` (simulation par défaut). _Exig. 9.9_
 - [x] 9.6 Tests sur une vraie base SQLite (migrations du dépôt) et un faux R2 : `test/duplicates.test.ts`.
 - [x] 9.8 Ménage par créateur depuis la page Créateurs (repris de memento-local le 2026-10-11) : route `POST /api/creators/<id>/duplicates` par lots, suppression des fiches entièrement en double, fenêtre de simulation, confirmation et bilan. Tests. _Exig. 9.10_
+- [x] 9.9 Quasi-doublons par empreinte visuelle et second regard pixel à pixel (repris de memento-local L10.10 à L10.13, commit 1df88b2, le 2026-10-11) : migration 0005, `fingerprint.ts` sur la liaison Images (`rgb`), reconnaissance à l'archivage, ménage par créateur avec calcul des empreintes par lots, relogement des doublons déjà reliés, `VISUAL_DEDUPE_THRESHOLD`. Tests (`test/visual.test.ts`). _Exig. 9.11_
 - [ ] 9.7 Appliquer la migration 0004 en production et lancer le rattrapage (simulation, puis application).
 
 ## Miniatures fabriquées (repris de memento-local v0.5.1 le 2026-10-05)

@@ -70,11 +70,13 @@ export interface MediaRow {
   /** Média identique à un original du même créateur : publication et position de cet original (exigence 9). */
   duplicate_post_id: string | null;
   duplicate_position: number | null;
+  /** Empreinte visuelle (64 caractères hexadécimaux), chaîne vide si non calculable, NULL si pas encore calculée. */
+  fingerprint: string | null;
 }
 
 /** Ligne de média à insérer ; le lien vers un original est facultatif (nul par défaut). */
-export type MediaInsert = Omit<MediaRow, "viewed_at" | "duplicate_post_id" | "duplicate_position"> &
-  Partial<Pick<MediaRow, "duplicate_post_id" | "duplicate_position">>;
+export type MediaInsert = Omit<MediaRow, "viewed_at" | "duplicate_post_id" | "duplicate_position" | "fingerprint"> &
+  Partial<Pick<MediaRow, "duplicate_post_id" | "duplicate_position" | "fingerprint">>;
 
 /** Médias non consultés qui comptent : téléchargés, et qui ne sont pas des doublons (exigence 9.7). */
 const UNVIEWED = "m.viewed_at IS NULL AND m.downloaded = 1 AND m.duplicate_post_id IS NULL";
@@ -231,13 +233,13 @@ export async function insertPost(
           `INSERT OR IGNORE INTO media
              (post_id, position, kind, mime_type, r2_key, etag, bytes, width, height,
               thumb_r2_key, thumb_width, thumb_height, description, source_url, downloaded,
-              duplicate_post_id, duplicate_position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              duplicate_post_id, duplicate_position, fingerprint)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           m.post_id, m.position, m.kind, m.mime_type, m.r2_key, m.etag, m.bytes, m.width, m.height,
           m.thumb_r2_key, m.thumb_width, m.thumb_height, m.description, m.source_url, m.downloaded,
-          m.duplicate_post_id ?? null, m.duplicate_position ?? null,
+          m.duplicate_post_id ?? null, m.duplicate_position ?? null, m.fingerprint ?? null,
         ),
     ),
   ];

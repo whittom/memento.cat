@@ -33,7 +33,7 @@ export const api = {
   purge: (id: string, confirm?: string) =>
     request<{ remaining: number; done: boolean }>(`/creators/${enc(id)}/purge`, post({ confirm })),
   duplicates: (id: string, apply: boolean) =>
-    request<{ count: number; freeableBytes: number; postCount: number; linked: number; deletedPosts: number; done: boolean }>(
+    request<{ pendingFingerprints: number; count: number; visualCount: number; freeableBytes: number; postCount: number; linked: number; deletedPosts: number; done: boolean }>(
       `/creators/${enc(id)}/duplicates`,
       post({ apply }),
     ),

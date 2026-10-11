@@ -45,6 +45,8 @@
     "MAX_PAGES_PER_CREATOR": "3",
     "MAX_MEDIA_BYTES": "104857600",
     "RATE_LIMIT_FLOOR": "10",
+    // Quasi-doublons : écart d'empreinte maximal (bits sur 256) pour relier une image à un original ; "0" désactive.
+    "VISUAL_DEDUPE_THRESHOLD": "6",
     // Pour Reddit : "<plateforme>:<id app>:<version> (by /u/<utilisateur>)"
     "REDDIT_USER_AGENT": "",
     // Nom qui identifie cette installation auprès des serveurs Mastodon, par exemple "monsite.exemple (archive personnelle en lecture seule)".

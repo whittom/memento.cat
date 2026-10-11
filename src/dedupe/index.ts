@@ -8,16 +8,32 @@ import {
   linkMedia,
   unlinkMedia,
   type DedupeCandidate,
+  type MediaRow,
   type OriginalOf,
 } from "../storage/db";
 import { postJsonKey } from "../storage/keys";
 import { putJson } from "../storage/r2";
+import { readConfig } from "../lib/config";
 import { purgePosts } from "../purge";
+import {
+  CONFIRM_MAX_BITS,
+  CONFIRM_MAX_PIXEL_DIFF,
+  distance,
+  fingerprintOf,
+  fromHex,
+  pixelCount,
+  pixelDifference,
+  pixelSampleOf,
+  sameAspect,
+  toHex,
+  type Fingerprint,
+  type PixelSample,
+} from "./fingerprint";
 
 /**
- * Médias identiques (exigence 9) : relogement des doublons avant un effacement, et rattrapage des
- * doublons déjà archivés. Tout passe par les liaisons D1 et R2 du Worker : aucune sous-requête externe,
- * aucun décodage d'image (la reconnaissance est exacte : adresse, ou empreinte MD5 et taille).
+ * Médias identiques (exigence 9) : relogement des doublons avant un effacement, rattrapage des doublons déjà
+ * archivés, et ménage par créateur. Les copies identiques se reconnaissent par l'adresse ou l'empreinte MD5 et la
+ * taille ; les quasi-doublons (exigence 9.11), par empreinte visuelle, calculée par la liaison Cloudflare Images.
  */
 
 type Link = { postId: string; position: number };
@@ -126,6 +142,10 @@ export interface DuplicateLink {
   duplicate: Link;
   original: Link;
   bytes: number;
+  /** « contenu » : mêmes octets ; « visuel » : même image, encodage différent (exigence 9.11). */
+  reason: "contenu" | "visuel";
+  /** Bits d'écart entre les empreintes (0 pour le contenu). */
+  distance: number;
 }
 
 /**
@@ -149,16 +169,63 @@ export async function planDuplicates(env: Env, creatorId?: string): Promise<Dupl
       duplicate: { postId: c.post_id, position: c.position },
       original: { postId: original.post_id, position: original.position },
       bytes: c.bytes,
+      reason: "contenu",
+      distance: 0,
     });
   }
   return links;
 }
 
 /**
- * Doublons reliés par appel : chacun coûte jusqu'à six requêtes D1 (deux lectures de médias, le préfixe, la
- * mise à jour, deux vérifications de fichiers) ; 6 × 6 + le plan reste sous les 50 requêtes du plan gratuit.
+ * Doublons reliés par appel. Un lien coûte jusqu'à huit requêtes D1 (deux lectures de médias, le préfixe, la mise à
+ * jour, les doublons déjà reliés au média, deux vérifications de fichiers), plus une par doublon déjà relié qui
+ * change d'original : 4 liens tiennent sous les 50 requêtes du plan gratuit, plan compris.
  */
-export const DEDUPE_BATCH = 6;
+export const DEDUPE_BATCH = 4;
+
+/**
+ * Relie un média à son original, dans cet ordre : post.json, ligne D1, doublons qui lui étaient déjà reliés (ils
+ * passent à l'original, pour ne jamais créer de chaîne), puis suppression des anciens fichiers qui ne servent plus à
+ * aucune ligne. Une interruption laisse au pire un fichier orphelin ou un doublon non relié : le plan suivant reprend.
+ */
+async function applyLink(env: Env, link: DuplicateLink): Promise<boolean> {
+  const original = await getMedia(env.DB, link.original.postId, link.original.position);
+  const old = await getMedia(env.DB, link.duplicate.postId, link.duplicate.position);
+  const post = await env.DB.prepare("SELECT r2_prefix FROM posts WHERE id = ?").bind(link.duplicate.postId).first<{ r2_prefix: string }>();
+  if (!original?.r2_key || original.duplicate_post_id || !old || !post) return false;
+
+  await patchPostJson(env.MEDIA, post.r2_prefix, [{ position: link.duplicate.position, original }]);
+  await linkMedia(env.DB, link.duplicate.postId, link.duplicate.position, original);
+
+  const { results: dependents } = await env.DB
+    .prepare(
+      `SELECT m.post_id, m.position, p.r2_prefix FROM media m JOIN posts p ON p.id = m.post_id
+       WHERE m.duplicate_post_id = ? AND m.duplicate_position = ?`,
+    )
+    .bind(link.duplicate.postId, link.duplicate.position)
+    .all<{ post_id: string; position: number; r2_prefix: string }>();
+  for (const d of dependents) {
+    await patchPostJson(env.MEDIA, d.r2_prefix, [{ position: d.position, original }]);
+    await linkMedia(env.DB, d.post_id, d.position, original);
+  }
+
+  const obsolete: string[] = [];
+  for (const key of [old.r2_key, old.thumb_r2_key]) {
+    if (key && key !== original.r2_key && key !== original.thumb_r2_key && !(await keyInUseElsewhere(env.DB, key, link.duplicate.postId))) {
+      obsolete.push(key);
+    }
+  }
+  if (obsolete.length > 0) await env.MEDIA.delete(obsolete);
+  log.info("média identique relié (ménage)", {
+    post: link.duplicate.postId,
+    position: link.duplicate.position,
+    original: `${link.original.postId}#${link.original.position}`,
+    par: link.reason,
+    ecart: link.distance,
+    relies: dependents.length,
+  });
+  return true;
+}
 
 export interface DedupeProgress {
   /** Doublons trouvés (avant ce lot). */
@@ -171,10 +238,8 @@ export interface DedupeProgress {
 }
 
 /**
- * Un appel du rattrapage. Sans `apply`, simule : rien n'est écrit. Avec `apply`, relie au plus DEDUPE_BATCH
- * doublons, dans cet ordre : post.json, ligne D1, puis suppression des anciens fichiers qui ne servent plus
- * à aucune ligne. Une interruption laisse au pire un fichier orphelin ou un doublon non relié : l'appel suivant
- * reprend (le plan est recalculé à chaque fois).
+ * Un appel du rattrapage par le contenu, tous créateurs confondus (`POST /api/admin/dedupe`). Sans `apply`, simule :
+ * rien n'est écrit. Avec `apply`, relie au plus DEDUPE_BATCH doublons (le plan est recalculé à chaque appel).
  */
 export async function dedupeBatch(env: Env, opts: { apply: boolean; creatorId?: string }): Promise<DedupeProgress> {
   const plan = await planDuplicates(env, opts.creatorId);
@@ -186,28 +251,152 @@ export async function dedupeBatch(env: Env, opts: { apply: boolean; creatorId?: 
     examples: plan.slice(0, 10),
   };
   if (!opts.apply) return progress;
-
-  for (const link of plan.slice(0, DEDUPE_BATCH)) {
-    const original = await getMedia(env.DB, link.original.postId, link.original.position);
-    const old = await getMedia(env.DB, link.duplicate.postId, link.duplicate.position);
-    const post = await env.DB.prepare("SELECT r2_prefix FROM posts WHERE id = ?").bind(link.duplicate.postId).first<{ r2_prefix: string }>();
-    if (!original?.r2_key || !old || !post) continue;
-
-    await patchPostJson(env.MEDIA, post.r2_prefix, [{ position: link.duplicate.position, original }]);
-    await linkMedia(env.DB, link.duplicate.postId, link.duplicate.position, original);
-    const obsolete: string[] = [];
-    for (const key of [old.r2_key, old.thumb_r2_key]) {
-      if (key && key !== original.r2_key && key !== original.thumb_r2_key && !(await keyInUseElsewhere(env.DB, key, link.duplicate.postId))) {
-        obsolete.push(key);
-      }
-    }
-    if (obsolete.length > 0) await env.MEDIA.delete(obsolete);
-    log.info("média identique relié (rattrapage)", { post: link.duplicate.postId, position: link.duplicate.position, original: `${link.original.postId}#${link.original.position}` });
-    progress.linked++;
-  }
+  for (const link of plan.slice(0, DEDUPE_BATCH)) if (await applyLink(env, link)) progress.linked++;
   progress.remaining = plan.length - progress.linked;
   return progress;
 }
+
+// ---------- Quasi-doublons d'un créateur (exigence 9.11) ----------
+
+/** Empreintes calculées par appel : chacune coûte une lecture R2, une transformation Images et une requête D1. */
+export const FINGERPRINT_BATCH = 15;
+/** Seconds regards par plan : chacun coûte au plus deux transformations Images. */
+export const MAX_PLAN_CONFIRMATIONS = 30;
+
+/** Calcule et conserve les empreintes manquantes des images d'un créateur, par lot ; renvoie le nombre qui reste. */
+export async function fingerprintBatch(env: Env, creatorId: string): Promise<{ computed: number; remaining: number }> {
+  const missing = `FROM media m JOIN posts p ON p.id = m.post_id
+     WHERE p.creator_id = ? AND m.kind = 'image' AND m.downloaded = 1 AND m.r2_key IS NOT NULL
+       AND m.duplicate_post_id IS NULL AND m.fingerprint IS NULL`;
+  const { results } = await env.DB
+    .prepare(`SELECT m.post_id, m.position, m.r2_key, m.mime_type, m.bytes ${missing} LIMIT ?`)
+    .bind(creatorId, FINGERPRINT_BATCH)
+    .all<{ post_id: string; position: number; r2_key: string; mime_type: string | null; bytes: number | null }>();
+  for (const row of results) {
+    const print = await fingerprintOf({ images: env.IMAGES, bucket: env.MEDIA, key: row.r2_key, mimeType: row.mime_type, bytes: row.bytes });
+    await env.DB
+      .prepare("UPDATE media SET fingerprint = ? WHERE post_id = ? AND position = ?")
+      .bind(print ? toHex(print) : "", row.post_id, row.position)
+      .run();
+  }
+  if (results.length < FINGERPRINT_BATCH) return { computed: results.length, remaining: 0 };
+  const left = await env.DB.prepare(`SELECT COUNT(*) AS n ${missing}`).bind(creatorId).first<{ n: number }>();
+  return { computed: results.length, remaining: left?.n ?? 0 };
+}
+
+type Candidate = Pick<MediaRow, "post_id" | "position" | "kind" | "r2_key" | "etag" | "bytes" | "mime_type" | "width" | "height" | "fingerprint">;
+
+/**
+ * Plan complet d'un créateur (exigences 9.9 et 9.11).
+ * 1. Même contenu : le premier archivé dont le fichier existe est l'original.
+ * 2. Même image, autre encodage : parmi les originaux restants, la meilleure image de chaque groupe (le plus de pixels,
+ *    puis d'octets, puis la plus ancienne) devient l'original. Une image est reliée si l'écart d'empreinte est d'au plus
+ *    `threshold` bits, ou d'au plus CONFIRM_MAX_BITS et que le second regard pixel à pixel le confirme. Chaque image
+ *    n'est comparée qu'aux originaux de groupe : jamais de chaîne.
+ * Une requête D1, une opération R2 par groupe de copies, et les seconds regards (liaison Images).
+ */
+export async function planCreatorDuplicates(env: Env, creatorId: string, threshold: number): Promise<DuplicateLink[]> {
+  const { results: rows } = await env.DB
+    .prepare(
+      `SELECT m.post_id, m.position, m.kind, m.r2_key, m.etag, m.bytes, m.mime_type, m.width, m.height, m.fingerprint
+       FROM media m JOIN posts p ON p.id = m.post_id
+       WHERE p.creator_id = ? AND m.downloaded = 1 AND m.r2_key IS NOT NULL AND m.duplicate_post_id IS NULL
+       ORDER BY p.rowid, m.position`,
+    )
+    .bind(creatorId)
+    .all<Candidate>();
+  const linkOf = (c: Candidate, o: Candidate, reason: DuplicateLink["reason"], bits: number): DuplicateLink => ({
+    creatorId,
+    duplicate: { postId: c.post_id, position: c.position },
+    original: { postId: o.post_id, position: o.position },
+    bytes: c.bytes ?? 0,
+    reason,
+    distance: bits,
+  });
+
+  // 1. Même contenu. Le fichier d'un original n'est vérifié que s'il a des copies.
+  const groups = new Map<string, Candidate[]>();
+  for (const r of rows) {
+    const k = r.etag !== null && r.bytes !== null ? `${r.kind}|${r.etag}|${r.bytes}` : `seul|${r.post_id}|${r.position}`;
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  const unique: Candidate[] = [];
+  const exact: { link: DuplicateLink; of: Candidate }[] = [];
+  for (const g of groups.values()) {
+    if (g.length === 1) {
+      unique.push(g[0]!);
+      continue;
+    }
+    let head: Candidate | undefined;
+    for (const c of g) {
+      if (!head) {
+        const stored = c.r2_key ? await env.MEDIA.head(c.r2_key) : null;
+        if (stored && stored.size === c.bytes) {
+          head = c;
+          unique.push(c);
+        }
+        continue;
+      }
+      exact.push({ link: linkOf(c, head, "contenu", 0), of: head });
+    }
+  }
+
+  // 2. Même image, autre encodage.
+  const visual: DuplicateLink[] = [];
+  if (threshold > 0 && env.IMAGES) {
+    const prints = new Map<Candidate, Fingerprint>();
+    for (const c of unique) {
+      const print = c.kind === "image" ? fromHex(c.fingerprint) : null;
+      if (print) prints.set(c, print);
+    }
+    const order = (c: Candidate) => rows.indexOf(c);
+    const ranked = [...prints.keys()].sort((a, b) => pixelCount(b) - pixelCount(a) || (b.bytes ?? 0) - (a.bytes ?? 0) || order(a) - order(b));
+    const samples = new Map<Candidate, PixelSample | null>();
+    let confirmations = 0;
+    const sampleOf = async (c: Candidate) => {
+      if (!samples.has(c)) {
+        samples.set(c, await pixelSampleOf({ images: env.IMAGES, bucket: env.MEDIA, key: c.r2_key ?? "", mimeType: c.mime_type, bytes: c.bytes }));
+      }
+      return samples.get(c) ?? null;
+    };
+    const confirmed = async (a: Candidate, b: Candidate) => {
+      if (confirmations >= MAX_PLAN_CONFIRMATIONS) return false;
+      confirmations++;
+      const x = await sampleOf(a);
+      const y = x ? await sampleOf(b) : null;
+      return !!x && !!y && pixelDifference(x, y) <= CONFIRM_MAX_PIXEL_DIFF;
+    };
+    const heads: Candidate[] = [];
+    for (const c of ranked) {
+      const print = prints.get(c);
+      if (!print) continue;
+      const near: { head: Candidate; bits: number }[] = [];
+      for (const h of heads) {
+        const other = prints.get(h);
+        if (other && sameAspect(c, h)) near.push({ head: h, bits: distance(print, other) });
+      }
+      near.sort((a, b) => a.bits - b.bits);
+      let match: { head: Candidate; bits: number } | null = null;
+      for (const n of near) {
+        if (n.bits > CONFIRM_MAX_BITS) break;
+        if (n.bits <= threshold || (await confirmed(c, n.head))) {
+          match = n;
+          break;
+        }
+      }
+      if (match) {
+        const head = match.head;
+        visual.push(linkOf(c, head, "visuel", match.bits));
+        // Les copies exactes de c rejoignent l'original du groupe.
+        for (const e of exact) if (e.of === c) e.link.original = { postId: head.post_id, position: head.position };
+      } else {
+        heads.push(c);
+      }
+    }
+  }
+  return [...exact.map((e) => e.link), ...visual];
+}
+
 
 // ---------- Ménage d'un créateur depuis la page Créateurs (exigence 9.10) ----------
 
@@ -261,8 +450,12 @@ export async function deleteRedundantPosts(env: Env, posts: RedundantPost[]): Pr
 }
 
 export interface CreatorDedupe {
-  /** Médias encore à relier à leur première occurrence. */
+  /** Empreintes visuelles encore à calculer avant de pouvoir chiffrer le plan (la galerie rappelle en attendant). */
+  pendingFingerprints: number;
+  /** Médias encore à relier à leur première occurrence (ou à la meilleure image du groupe). */
   count: number;
+  /** Dont quasi-doublons (même image, autre encodage). */
+  visualCount: number;
   freeableBytes: number;
   /** Fiches dont tous les médias sont (ou seront) des doublons. */
   postCount: number;
@@ -273,28 +466,36 @@ export interface CreatorDedupe {
 }
 
 /**
- * Ménage des doublons d'un créateur, par lots (exigence 9.10). Sans `apply`, simule. Avec `apply`, chaque appel
- * relie d'abord au plus DEDUPE_BATCH médias ; quand il n'en reste plus, il supprime au plus REDUNDANT_BATCH fiches
- * entièrement en double. La galerie rappelle jusqu'à `done`. Une interruption se reprend en rappelant.
+ * Ménage des doublons d'un créateur, par lots (exigences 9.10 et 9.11). Chaque appel, simulation comprise, calcule
+ * d'abord au plus FINGERPRINT_BATCH empreintes manquantes : tant qu'il en reste, il ne renvoie que leur nombre. Puis,
+ * sans `apply`, il chiffre le plan ; avec `apply`, il relie au plus DEDUPE_BATCH médias, et quand il n'en reste plus,
+ * supprime au plus REDUNDANT_BATCH fiches entièrement en double. La galerie rappelle jusqu'à la fin.
  */
 export async function dedupeCreator(env: Env, creatorId: string, apply: boolean): Promise<CreatorDedupe> {
-  const plan = await planDuplicates(env, creatorId);
+  const threshold = readConfig(env).visualDedupeThreshold;
+  const out: CreatorDedupe = { pendingFingerprints: 0, count: 0, visualCount: 0, freeableBytes: 0, postCount: 0, linked: 0, deletedPosts: 0, done: false };
+
+  if (threshold > 0 && env.IMAGES) {
+    const prints = await fingerprintBatch(env, creatorId);
+    if (prints.remaining > 0) {
+      out.pendingFingerprints = prints.remaining;
+      return out;
+    }
+  }
+
+  const plan = await planCreatorDuplicates(env, creatorId, threshold);
   const redundant = await planRedundantPosts(env, creatorId, plan);
-  const out: CreatorDedupe = {
-    count: plan.length,
-    freeableBytes: plan.reduce((n, l) => n + l.bytes, 0),
-    postCount: redundant.length,
-    linked: 0,
-    deletedPosts: 0,
-    done: plan.length === 0 && redundant.length === 0,
-  };
+  out.count = plan.length;
+  out.visualCount = plan.filter((l) => l.reason === "visuel").length;
+  out.freeableBytes = plan.reduce((n, l) => n + l.bytes, 0);
+  out.postCount = redundant.length;
+  out.done = plan.length === 0 && redundant.length === 0;
   if (!apply || out.done) return out;
 
   if (plan.length > 0) {
-    const r = await dedupeBatch(env, { apply: true, creatorId });
-    out.linked = r.linked;
+    for (const link of plan.slice(0, DEDUPE_BATCH)) if (await applyLink(env, link)) out.linked++;
     // Rien relié alors qu'il en restait : on s'arrête plutôt que de boucler.
-    out.done = r.linked === 0;
+    out.done = out.linked === 0;
   } else {
     const r = await deleteRedundantPosts(env, redundant.slice(0, REDUNDANT_BATCH));
     out.deletedPosts = r.deleted;
