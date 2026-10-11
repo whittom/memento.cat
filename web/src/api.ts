@@ -32,6 +32,11 @@ export const api = {
   stats: (id: string) => request<{ posts: number; media: number; bytes: number }>(`/creators/${enc(id)}/stats`),
   purge: (id: string, confirm?: string) =>
     request<{ remaining: number; done: boolean }>(`/creators/${enc(id)}/purge`, post({ confirm })),
+  duplicates: (id: string, apply: boolean) =>
+    request<{ count: number; freeableBytes: number; postCount: number; linked: number; deletedPosts: number; done: boolean }>(
+      `/creators/${enc(id)}/duplicates`,
+      post({ apply }),
+    ),
   sync: (id: string) => request<{ archived: number; done: boolean }>(`/creators/${enc(id)}/sync`, post({})),
   verify: (id: string, startedAt: string | null) =>
     request<{ startedAt: string; processed: number; deleted: number; purged: number; remaining: number }>(

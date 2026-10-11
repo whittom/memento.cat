@@ -203,6 +203,7 @@ function creatorRow(c: Creator, refresh: () => void): HTMLElement {
         c.state === "active" ? "Désactiver" : "Réactiver",
       ),
       verifyBtn,
+      h("button", { type: "button", class: "btn btn-quiet", onclick: () => openDuplicatesDialog(c, refresh) }, "Supprimer les doublons…"),
       h("button", { type: "button", class: "btn btn-quiet btn-danger", onclick: () => openDeleteDialog(c, refresh) }, "Supprimer…"),
     ),
     progress,
@@ -340,6 +341,76 @@ function openDeleteDialog(c: Creator, refresh: () => void, physicalOnly = false)
     h("div", { class: "dialog-foot" }, close),
   );
   dialog.addEventListener("close", () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+/**
+ * Ménage des doublons d'un créateur (exigence 9.10) : la simulation, puis la confirmation, la progression et le
+ * bilan dans une fenêtre de la page. Le Worker travaille par lots : la fenêtre rappelle l'API jusqu'à la fin.
+ * Pas de `window.confirm` : certains navigateurs intégrés le ferment d'office, et le bilan resterait invisible.
+ */
+function openDuplicatesDialog(c: Creator, refresh: () => void): void {
+  const dialog = h("dialog", { class: "dialog", "aria-labelledby": "dup-title" });
+  const summary = h("p", { role: "status" }, "Recherche des doublons…");
+  const result = h("p", { class: "progress", role: "status" });
+  const applyBtn = h("button", { type: "button", class: "btn btn-danger", disabled: true }, "Supprimer les doublons");
+  const close = h("button", { type: "button", class: "btn btn-quiet", onclick: () => dialog.close() }, "Annuler");
+  let changed = false;
+
+  void api.duplicates(c.id, false).then(
+    (plan) => {
+      if (plan.done) {
+        summary.textContent = "Aucun doublon : chaque média n'apparaît qu'une fois.";
+        close.textContent = "Fermer";
+        return;
+      }
+      const parts = [
+        plan.postCount > 0 ? `${plural(plan.postCount, "fiche sera supprimée", "fiches seront supprimées")} : toutes ses images sont déjà dans une fiche plus ancienne.` : null,
+        plan.count > 0
+          ? `${plural(plan.count, "média en double sera relié", "médias en double seront reliés")} à sa première occurrence, ${fmtBytes(plan.freeableBytes)} libérés.`
+          : null,
+      ].filter(Boolean);
+      summary.textContent = `${parts.join(" ")} Seule la première occurrence de chaque média est conservée. La suppression est définitive.`;
+      applyBtn.disabled = false;
+    },
+    (e: unknown) => {
+      summary.textContent = errorText(e);
+    },
+  );
+
+  applyBtn.addEventListener("click", async () => {
+    applyBtn.disabled = true;
+    close.disabled = true;
+    let linked = 0;
+    let deleted = 0;
+    result.textContent = "Suppression en cours…";
+    try {
+      for (;;) {
+        const r = await api.duplicates(c.id, true);
+        linked += r.linked;
+        deleted += r.deletedPosts;
+        changed = true;
+        result.textContent = `En cours : ${plural(linked, "média relié", "médias reliés")}, ${plural(deleted, "fiche supprimée", "fiches supprimées")}…`;
+        if (r.done) break;
+      }
+      const text = `${plural(deleted, "fiche supprimée", "fiches supprimées")}, ${plural(linked, "média relié", "médias reliés")}.`;
+      result.textContent = text;
+      toast(`${c.handle} : ${text}`);
+      close.textContent = "Fermer";
+    } catch (e) {
+      result.textContent = `${errorText(e)} Relancez pour reprendre.`;
+      applyBtn.disabled = false;
+    } finally {
+      close.disabled = false;
+    }
+  });
+
+  addChildren(dialog, h("h2", { id: "dup-title" }, `Doublons de ${c.displayName || c.handle}`), summary, applyBtn, result, h("div", { class: "dialog-foot" }, close));
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    if (changed) refresh(); // les compteurs changent ; le bilan reste dans la notification
+  });
   document.body.append(dialog);
   dialog.showModal();
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { handleApi } from "../src/api";
 import { archivePost } from "../src/collect/archive";
 import type { NormalizedMedia, NormalizedPost } from "../src/connectors/types";
-import { dedupeBatch } from "../src/dedupe";
+import { DEDUPE_BATCH, dedupeBatch, dedupeCreator } from "../src/dedupe";
 import { purgePosts } from "../src/purge";
 import { Budget } from "../src/lib/budget";
 import type { Config } from "../src/lib/config";
@@ -191,5 +191,76 @@ describe("rattrapage des doublons déjà archivés (exigence 9.9)", () => {
   it("limité à un créateur, ne touche pas aux autres", async () => {
     const { env } = await legacy();
     expect(await dedupeBatch(env, { apply: true, creatorId: B })).toMatchObject({ found: 0, linked: 0 });
+  });
+});
+
+describe("ménage des doublons d'un créateur depuis la page Créateurs (exigence 9.10)", () => {
+  /** Archive d'avant la reconnaissance : n publications, chacune avec les médias indiqués (contenu brut), aucun lien. */
+  async function archiveOf(spec: string[][]) {
+    const ctx = await setup();
+    for (const [i, contents] of spec.entries()) {
+      const n = i + 1;
+      const p = post(A, n, contents.map((_, k) => media(`https://cdn/${n}-${k}.jpg`)));
+      const prefix = `bluesky/a/2026/09/${n}/`;
+      const rows: MediaInsert[] = [];
+      for (const [k, content] of contents.entries()) {
+        const key = `${prefix}media_0${k + 1}.jpg`;
+        const stored = (await ctx.env.MEDIA.put(key, content))!;
+        rows.push({
+          post_id: p.id, position: k, kind: "image", mime_type: "image/jpeg", r2_key: key, etag: stored.etag, bytes: stored.size,
+          width: 10, height: 10, thumb_r2_key: null, thumb_width: null, thumb_height: null, description: null, source_url: p.media[k]!.sourceUrl, downloaded: 1,
+        });
+      }
+      await ctx.env.MEDIA.put(`${prefix}post.json`, JSON.stringify({ ...p, media: rows.map((r) => ({ r2Key: r.r2_key, duplicateOf: null })) }));
+      await insertPost(ctx.env.DB, p, prefix, rows, NOW);
+    }
+    return ctx;
+  }
+
+  async function runAll(env: Env, id = A) {
+    const total = { linked: 0, deletedPosts: 0, calls: 0 };
+    for (;;) {
+      const r = await dedupeCreator(env, id, true);
+      total.linked += r.linked;
+      total.deletedPosts += r.deletedPosts;
+      total.calls++;
+      if (r.done || total.calls > 50) return total;
+    }
+  }
+
+  it("simule : médias à relier, fiches entièrement en double, rien d'écrit", async () => {
+    const { env, sqlite } = await archiveOf([["x", "y"], ["x"], ["y", "z"]]);
+    expect(await dedupeCreator(env, A, false)).toMatchObject({ count: 2, postCount: 1, linked: 0, deletedPosts: 0, done: false });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM posts").get()?.["n"]).toBe(3);
+  });
+
+  it("garde la première occurrence, relie les autres et supprime les fiches faites uniquement de doublons", async () => {
+    const { env, sqlite, media: r2 } = await archiveOf([["x", "y"], ["x"], ["y", "z"]]);
+    expect(await runAll(env)).toMatchObject({ linked: 2, deletedPosts: 1 });
+    const posts = sqlite.prepare("SELECT id FROM posts ORDER BY rowid").all().map((r) => r["id"]);
+    expect(posts).toEqual(["bluesky:a1", "bluesky:a3"]);
+    // La galerie qui garde une image propre (z) reste entière, son doublon (y) relié à la première occurrence.
+    expect(mediaRows(sqlite, "bluesky:a3")[0]).toMatchObject({ duplicate_post_id: "bluesky:a1", duplicate_position: 1 });
+    expect(mediaRows(sqlite, "bluesky:a3")[1]).toMatchObject({ duplicate_post_id: null });
+    expect([...r2.files.keys()].some((k) => k.startsWith("bluesky/a/2026/09/2/"))).toBe(false);
+    expect(r2.files.has("bluesky/a/2026/09/1/media_01.jpg")).toBe(true);
+    expect(await dedupeCreator(env, A, false)).toMatchObject({ count: 0, postCount: 0, done: true });
+  });
+
+  it("travaille par lots sous la limite du plan gratuit et termine", async () => {
+    const { env, sqlite } = await archiveOf(Array.from({ length: DEDUPE_BATCH + 4 }, () => ["même"]));
+    const total = await runAll(env);
+    expect(total.calls).toBeGreaterThan(1);
+    expect(total).toMatchObject({ linked: DEDUPE_BATCH + 3, deletedPosts: DEDUPE_BATCH + 3 });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM posts").get()?.["n"]).toBe(1);
+  });
+
+  it("ne touche pas aux autres créateurs, et refuse un créateur à la corbeille", async () => {
+    const { env, sqlite } = await archiveOf([["x"], ["x"]]);
+    expect(await dedupeCreator(env, B, true)).toMatchObject({ count: 0, done: true });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM posts").get()?.["n"]).toBe(2);
+    sqlite.prepare("UPDATE creators SET state = 'deleted' WHERE id = ?").run(A);
+    const call = handleApi(new Request(`https://m/api/creators/${encodeURIComponent(A)}/duplicates`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), env);
+    await expect(call).rejects.toMatchObject({ status: 409 });
   });
 });

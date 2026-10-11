@@ -20,7 +20,7 @@ import {
   type CreatorRow,
   type CreatorWithCounts,
 } from "../storage/db";
-import { dedupeBatch } from "../dedupe";
+import { dedupeBatch, dedupeCreator } from "../dedupe";
 import { verifyBatch } from "../verify";
 import { decodeCursor, encodeCursor, json, parseDay, readBody } from "./http";
 import { presentPost } from "./present";
@@ -140,6 +140,14 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         throw new HttpError(400, "Confirmation incorrecte : retapez le nom exact du créateur");
       }
       return json(await purgeBatch(env, id));
+    }
+
+    // Doublons d'un créateur (exigence 9.10) : sans `apply`, la simulation ; avec `apply: true`, un lot du ménage.
+    if (id && action === "duplicates" && method === "POST") {
+      const creator = await requireCreator(env, id);
+      if (creator.state !== "active" && creator.state !== "paused") throw new HttpError(409, "Restaurez d'abord ce créateur depuis la corbeille");
+      const apply = bool((await readBody(request))["apply"]) === true;
+      return json(await dedupeCreator(env, id, apply));
     }
 
     if (id && action === "sync" && method === "POST") {

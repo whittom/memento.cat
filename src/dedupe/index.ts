@@ -12,6 +12,7 @@ import {
 } from "../storage/db";
 import { postJsonKey } from "../storage/keys";
 import { putJson } from "../storage/r2";
+import { purgePosts } from "../purge";
 
 /**
  * Médias identiques (exigence 9) : relogement des doublons avant un effacement, et rattrapage des
@@ -153,8 +154,11 @@ export async function planDuplicates(env: Env, creatorId?: string): Promise<Dupl
   return links;
 }
 
-/** Doublons reliés par appel : chacun coûte environ quatre requêtes D1 et quatre opérations R2. */
-export const DEDUPE_BATCH = 8;
+/**
+ * Doublons reliés par appel : chacun coûte jusqu'à six requêtes D1 (deux lectures de médias, le préfixe, la
+ * mise à jour, deux vérifications de fichiers) ; 6 × 6 + le plan reste sous les 50 requêtes du plan gratuit.
+ */
+export const DEDUPE_BATCH = 6;
 
 export interface DedupeProgress {
   /** Doublons trouvés (avant ce lot). */
@@ -203,4 +207,99 @@ export async function dedupeBatch(env: Env, opts: { apply: boolean; creatorId?: 
   }
   progress.remaining = plan.length - progress.linked;
   return progress;
+}
+
+// ---------- Ménage d'un créateur depuis la page Créateurs (exigence 9.10) ----------
+
+/** Une publication dont tous les médias sont des doublons (déjà reliés, ou que le plan relie) : sa fiche est superflue. */
+export interface RedundantPost {
+  id: string;
+  prefix: string;
+}
+
+/** Fiches supprimées par appel : chacune coûte une liste R2, une vérification par fichier et environ cinq requêtes D1. */
+export const REDUNDANT_BATCH = 3;
+
+/**
+ * Les fiches à supprimer pour un créateur : celles dont **tous** les médias sont des doublons d'une première
+ * occurrence. Une galerie qui garde au moins un média propre reste entière, doublons liés compris. Une requête D1.
+ */
+export async function planRedundantPosts(env: Env, creatorId: string, links: DuplicateLink[]): Promise<RedundantPost[]> {
+  const planned = new Set(links.map((l) => `${l.duplicate.postId}#${l.duplicate.position}`));
+  const { results } = await env.DB
+    .prepare(
+      `SELECT p.id, p.r2_prefix AS prefix, m.position, m.duplicate_post_id AS dup
+         FROM posts p JOIN media m ON m.post_id = p.id
+        WHERE p.creator_id = ? AND p.status = 'active'
+        ORDER BY p.rowid, m.position`,
+    )
+    .bind(creatorId)
+    .all<{ id: string; prefix: string; position: number; dup: string | null }>();
+  const byPost = new Map<string, { prefix: string; all: boolean }>();
+  for (const r of results) {
+    const entry = byPost.get(r.id) ?? { prefix: r.prefix, all: true };
+    if (r.dup === null && !planned.has(`${r.id}#${r.position}`)) entry.all = false;
+    byPost.set(r.id, entry);
+  }
+  return [...byPost].filter(([, v]) => v.all).map(([id, v]) => ({ id, prefix: v.prefix }));
+}
+
+/** Supprime ces fiches (fichiers propres, index, publication). Une fiche dont un fichier sert encore à une autre est laissée. */
+export async function deleteRedundantPosts(env: Env, posts: RedundantPost[]): Promise<{ deleted: number; kept: number }> {
+  const safe: RedundantPost[] = [];
+  for (const post of posts) {
+    const own = (await env.MEDIA.list({ prefix: post.prefix, limit: 100 })).objects.map((o) => o.key);
+    let shared = false;
+    for (const key of own) if (!key.endsWith("post.json") && (await keyInUseElsewhere(env.DB, key, post.id))) shared = true;
+    if (shared) log.warn("fiche en double conservée : un de ses fichiers sert à une autre fiche", { post: post.id });
+    else safe.push(post);
+  }
+  // Les médias d'une fiche superflue sont tous des doublons : aucun autre média n'en dépend, pas de relogement.
+  await purgePosts(env, safe.map((p) => ({ id: p.id, r2_prefix: p.prefix })), { rehome: false });
+  for (const post of safe) log.info("fiche en double supprimée", { post: post.id });
+  return { deleted: safe.length, kept: posts.length - safe.length };
+}
+
+export interface CreatorDedupe {
+  /** Médias encore à relier à leur première occurrence. */
+  count: number;
+  freeableBytes: number;
+  /** Fiches dont tous les médias sont (ou seront) des doublons. */
+  postCount: number;
+  linked: number;
+  deletedPosts: number;
+  /** Vrai quand il ne reste rien à faire : la galerie arrête alors ses appels. */
+  done: boolean;
+}
+
+/**
+ * Ménage des doublons d'un créateur, par lots (exigence 9.10). Sans `apply`, simule. Avec `apply`, chaque appel
+ * relie d'abord au plus DEDUPE_BATCH médias ; quand il n'en reste plus, il supprime au plus REDUNDANT_BATCH fiches
+ * entièrement en double. La galerie rappelle jusqu'à `done`. Une interruption se reprend en rappelant.
+ */
+export async function dedupeCreator(env: Env, creatorId: string, apply: boolean): Promise<CreatorDedupe> {
+  const plan = await planDuplicates(env, creatorId);
+  const redundant = await planRedundantPosts(env, creatorId, plan);
+  const out: CreatorDedupe = {
+    count: plan.length,
+    freeableBytes: plan.reduce((n, l) => n + l.bytes, 0),
+    postCount: redundant.length,
+    linked: 0,
+    deletedPosts: 0,
+    done: plan.length === 0 && redundant.length === 0,
+  };
+  if (!apply || out.done) return out;
+
+  if (plan.length > 0) {
+    const r = await dedupeBatch(env, { apply: true, creatorId });
+    out.linked = r.linked;
+    // Rien relié alors qu'il en restait : on s'arrête plutôt que de boucler.
+    out.done = r.linked === 0;
+  } else {
+    const r = await deleteRedundantPosts(env, redundant.slice(0, REDUNDANT_BATCH));
+    out.deletedPosts = r.deleted;
+    out.done = redundant.length <= REDUNDANT_BATCH || r.deleted === 0;
+  }
+  log.info("ménage des doublons", { creator: creatorId, relies: out.linked, fiches: out.deletedPosts });
+  return out;
 }

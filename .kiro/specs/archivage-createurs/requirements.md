@@ -134,6 +134,9 @@ Reprise de l'exigence L10 de memento-local (2026-10-03), limitée à ce qui s'ex
    - l'original est le premier média archivé (ordre de la fiche, puis position) dont le fichier existe ; jamais de chaîne ;
    - il écrit `post.json` avant la base et ne supprime les fichiers en double qu'après : une interruption laisse une archive cohérente, et l'appel suivant termine le travail ;
    - il peut être limité à un créateur (`{"creator": "<id>"}`).
+10. **Depuis la page Créateurs (reprise de L10.12 de memento-local, 2026-10-11) :** LA page Créateurs DOIT offrir, pour chaque créateur suivi (actif ou désactivé), « Supprimer les doublons… » : une simulation (médias à relier, fiches entièrement en double, espace libérable), une confirmation dans une fenêtre de la page, puis le ménage de ce créateur seulement, avec sa progression et son bilan. Route `POST /api/creators/<id>/duplicates` (`{ apply }`), par lots, rappelée par la galerie jusqu'à la fin.
+    - **Seule la première occurrence d'un média est conservée** : les fiches dont **tous** les médias sont des doublons (déjà reliés, ou que ce ménage relie) sont **supprimées définitivement** (fichiers propres, index, publication). Une galerie qui garde au moins un média propre reste entière, doublons liés compris. Une fiche dont un fichier sert à une autre est conservée.
+    - Comme pour le reste de l'exigence 9, seules les copies identiques sont reconnues : pas de quasi-doublons.
 
 ## Exigence 10 — Miniatures fabriquées
 **Récit :** En tant qu'utilisateur, je veux que la galerie charge de petites images, pas les originaux de plusieurs mégaoctets.
