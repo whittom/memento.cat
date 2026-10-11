@@ -24,7 +24,7 @@ inclusion: always
 - Licence : PolyForm Noncommercial 1.0.0 (`LICENSE.md`).
 
 ## Contraintes du plan gratuit
-- 5 déclencheurs Cron par compte : un seul déclencheur pour tout le projet, toutes les 15 minutes.
+- 5 déclencheurs Cron par compte : deux pour le projet, la collecte toutes les 15 minutes et la maintenance des doublons (`7,37 * * * *`), aiguillées par `controller.cron`.
 - Par invocation : 50 sous-requêtes externes, 50 requêtes D1, 10 ms de processeur. Tout traitement répétitif passe par `Budget` / `countingDb` et par petits lots.
 - R2 : 10 Go gratuits ; surveiller le volume vidéo.
 - Secrets (identifiants Reddit) uniquement via `wrangler secret put`, jamais dans le dépôt.

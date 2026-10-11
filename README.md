@@ -108,7 +108,14 @@ Les secrets ne sont transmis qu'aux étapes qui en ont besoin, jamais à l'insta
 
 ## Médias identiques
 
-Quand un créateur republie une image déjà archivée (même adresse, ou même fichier sous une autre adresse), memento ne la stocke pas une seconde fois : le média est relié à l'original et sert son fichier. La galerie marque « Doublon » les publications faites uniquement de doublons, signale le lien dans la visionneuse, et le bouton « Masquer les doublons » les retire de la liste. Les doublons ne comptent pas parmi les médias non consultés. Une même image recompressée ou redimensionnée (quasi-doublon) est aussi reconnue, par une empreinte visuelle calculée avec la liaison Cloudflare Images : écart d'au plus 6 bits sur 256 (`VISUAL_DEDUPE_THRESHOLD`, 0 désactive) et même rapport largeur/hauteur, ou, pour une image sombre ou peu contrastée, jusqu'à 24 bits si une comparaison pixel à pixel le confirme. Les images archivées avant cette fonction reçoivent leur empreinte au premier ménage de leur créateur (page Créateurs) ; chaque empreinte compte parmi les 5 000 transformations Images gratuites par mois.
+Quand un créateur republie une image déjà archivée (même adresse, ou même fichier sous une autre adresse), memento ne la stocke pas une seconde fois : le média est relié à l'original et sert son fichier. La galerie marque « Doublon » les publications faites uniquement de doublons, signale le lien dans la visionneuse, et le bouton « Masquer les doublons » les retire de la liste. Les doublons ne comptent pas parmi les médias non consultés. Une même image recompressée ou redimensionnée (quasi-doublon) est aussi reconnue, par une empreinte visuelle calculée avec la liaison Cloudflare Images : écart d'au plus 6 bits sur 256 (`VISUAL_DEDUPE_THRESHOLD`, 0 désactive) et même rapport largeur/hauteur, ou, pour une image sombre ou peu contrastée, jusqu'à 24 bits si une comparaison pixel à pixel le confirme. Les images archivées avant cette fonction reçoivent leur empreinte d'elles-mêmes, par une maintenance planifiée (deux fois par heure, un créateur à la fois), ou au premier ménage de leur créateur ; chaque empreinte compte parmi les 5 000 transformations Images gratuites par mois.
+
+Autres règles :
+- **Avant téléchargement :** quand la plateforme fournit une miniature, elle est comparée d'abord ; un média reconnu n'est pas téléchargé (une vidéo republiée, surtout, ne coûte plus rien).
+- **Vidéos :** une même vidéo republiée est reconnue par sa miniature, avec une règle plus stricte que pour les images.
+- **Première occurrence :** une fiche plus ancienne archivée après une plus récente prend le média dès l'archivage.
+- **Maintenance automatique :** elle relie les doublons et réoriente les groupes, mais ne supprime jamais de fiche ; la suppression reste au bouton. `AUTO_DEDUPE = "false"` la désactive.
+- **Fiches écartées :** une fiche supprimée par le ménage n'est plus jamais réarchivée.
 
 Pour relier les doublons archivés avant cette fonction, ouvrir la galerie, puis la console des outils de développement :
 

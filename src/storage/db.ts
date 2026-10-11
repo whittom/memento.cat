@@ -196,15 +196,31 @@ export async function creatorStats(
   return row ?? { posts: 0, media: 0, bytes: 0 };
 }
 
+/** Efface le créateur et la liste de ses fiches écartées (exigence 9.13). */
 export async function deleteCreatorRow(db: D1Database, id: string): Promise<void> {
-  await db.prepare("DELETE FROM creators WHERE id = ?").bind(id).run();
+  await db.batch([
+    db.prepare("DELETE FROM discarded_posts WHERE creator_id = ?").bind(id),
+    db.prepare("DELETE FROM creators WHERE id = ?").bind(id),
+  ]);
 }
 
 // ---------- Publications ----------
 
+/** Vrai si la publication est déjà archivée, ou si le ménage l'a écartée comme doublon (exigence 9.13). Une requête. */
 export async function postExists(db: D1Database, id: string): Promise<boolean> {
-  const row = await db.prepare("SELECT 1 AS x FROM posts WHERE id = ?").bind(id).first<{ x: number }>();
+  const row = await db
+    .prepare("SELECT 1 AS x FROM posts WHERE id = ?1 UNION ALL SELECT 1 AS x FROM discarded_posts WHERE id = ?1 LIMIT 1")
+    .bind(id)
+    .first<{ x: number }>();
   return row !== null;
+}
+
+/** Retient les fiches supprimées par le ménage des doublons, pour ne plus les archiver (exigence 9.13). */
+export async function discardPosts(db: D1Database, creatorId: string, ids: string[], now: string): Promise<void> {
+  if (ids.length === 0) return;
+  await db.batch(
+    ids.map((id) => db.prepare("INSERT OR IGNORE INTO discarded_posts (id, creator_id, discarded_at) VALUES (?, ?, ?)").bind(id, creatorId, now)),
+  );
 }
 
 /** Insère une publication, ses médias et son entrée de recherche en une transaction. */

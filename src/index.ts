@@ -1,6 +1,7 @@
 import { assertAccess } from "./access";
 import { handleApi } from "./api";
 import { runCollection } from "./collect";
+import { MAINTENANCE_CRON, runMaintenance } from "./dedupe/maintenance";
 import { readConfig } from "./lib/config";
 import { HttpError, errorMessage } from "./lib/errors";
 import { log } from "./lib/log";
@@ -25,7 +26,15 @@ export default {
     }
   },
 
-  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): void {
+  scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): void {
+    if (controller.cron === MAINTENANCE_CRON) {
+      ctx.waitUntil(
+        runMaintenance(env).catch((e: unknown) => {
+          log.error("maintenance interrompue", { error: errorMessage(e) });
+        }),
+      );
+      return;
+    }
     ctx.waitUntil(
       runCollection(env).catch((e: unknown) => {
         log.error("collecte interrompue", { error: errorMessage(e) });

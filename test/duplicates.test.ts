@@ -12,7 +12,7 @@ import { localEnv } from "./local-env";
 const config: Config = {
   requireAccess: false, accessTeamDomain: "", accessAud: "",
   maxSubrequestsPerRun: 45, maxQueriesPerRun: 1000, maxPagesPerCreator: 3, maxMediaBytes: 1_000_000, rateLimitFloor: 10,
-  redditUserAgent: "", mastodonUserAgent: "memento (test)", visualDedupeThreshold: 0,
+  redditUserAgent: "", mastodonUserAgent: "memento (test)", visualDedupeThreshold: 0, autoDedupe: false,
 };
 const NOW = "2026-10-03T12:00:00.000Z";
 const A = "bluesky:did:plc:a";

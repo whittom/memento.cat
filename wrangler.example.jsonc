@@ -21,7 +21,9 @@
   },
 
   // Petits lots fréquents, pour rester sous les limites par invocation du plan gratuit.
-  "triggers": { "crons": ["*/15 * * * *"] },
+  // Deux déclencheurs : la collecte (toutes les 15 minutes) et la maintenance des doublons (deux fois par heure),
+  // chacun avec ses propres limites par invocation. Le plan gratuit permet 5 déclencheurs par compte.
+  "triggers": { "crons": ["*/15 * * * *", "7,37 * * * *"] },
 
   "d1_databases": [
     { "binding": "DB", "database_name": "memento-db", "database_id": "<ID_D1>", "migrations_dir": "migrations" }
@@ -47,6 +49,8 @@
     "RATE_LIMIT_FLOOR": "10",
     // Quasi-doublons : écart d'empreinte maximal (bits sur 256) pour relier une image à un original ; "0" désactive.
     "VISUAL_DEDUPE_THRESHOLD": "6",
+    // Maintenance planifiée des doublons (empreintes de l'archive existante, liens, réorientation ; jamais de suppression).
+    "AUTO_DEDUPE": "true",
     // Pour Reddit : "<plateforme>:<id app>:<version> (by /u/<utilisateur>)"
     "REDDIT_USER_AGENT": "",
     // Nom qui identifie cette installation auprès des serveurs Mastodon, par exemple "monsite.exemple (archive personnelle en lecture seule)".

@@ -103,7 +103,7 @@ export async function planOwnership(
   return { redundant: [...posts].filter(([, v]) => v.all).map(([id, v]) => ({ id, prefix: v.prefix })), moves };
 }
 
-interface GroupRow {
+export interface GroupRow {
   post_id: string;
   position: number;
   published_at: string;
@@ -161,65 +161,73 @@ async function rootsToMove(env: Env, creatorId: string): Promise<GroupRow[]> {
 }
 
 /**
- * Donne des groupes à leur fiche la plus ancienne, dans la limite du budget D1 de l'appel. Pour chaque groupe : copie
- * des fichiers sous la fiche la plus ancienne (sans écraser un fichier existant), post.json, base, puis suppression des
- * anciens fichiers devenus inutiles. Rend le nombre de groupes déplacés et le nombre qui reste.
+ * Donne un groupe à sa fiche la plus ancienne : copie du fichier (et de la miniature) sous cette fiche, sans écraser de
+ * fichier existant, post.json, une transaction D1 (le nouveau propriétaire reprend l'empreinte, les autres lui sont
+ * reliés), puis suppression des anciens fichiers inutilisés. `db` peut être la base décomptée d'une collecte. Rend vrai
+ * si le groupe a changé de fiche ; environ cinq requêtes D1 plus une par membre.
  */
-export async function reassignBatch(env: Env, creatorId: string): Promise<{ moved: number; remaining: number }> {
+export async function reassignRoot(env: Env, db: D1Database, rootRow: GroupRow): Promise<boolean> {
+  const { results: members } = await db
+    .prepare(`${SELECT} WHERE m.duplicate_post_id = ? AND m.duplicate_position = ? AND p.status = 'active'`)
+    .bind(rootRow.post_id, rootRow.position)
+    .all<GroupRow>();
+  const owner = [...members].sort(earlier)[0];
+  if (!owner || earlier(owner, rootRow) >= 0 || !rootRow.r2_key) return false;
+  const rootKey = rootRow.r2_key;
+
+  // Nouvelles clés sous la fiche la plus ancienne, sans écraser un fichier existant.
+  let slot = owner.position;
+  const keysAt = (s: number) => ({
+    media: mediaKey(owner.prefix, s, extOf(rootKey)),
+    thumb: rootRow.thumb_r2_key ? thumbKey(owner.prefix, s, extOf(rootRow.thumb_r2_key)) : null,
+  });
+  for (let i = 0; i < 5; i++) {
+    const k = keysAt(slot);
+    if (!(await env.MEDIA.head(k.media)) && !(k.thumb && (await env.MEDIA.head(k.thumb)))) break;
+    slot += 100;
+  }
+  const keys = keysAt(slot);
+  if (!(await copy(env.MEDIA, rootKey, keys.media))) return false;
+  if (rootRow.thumb_r2_key && keys.thumb && !(await copy(env.MEDIA, rootRow.thumb_r2_key, keys.thumb))) keys.thumb = null;
+
+  // post.json d'abord, puis la base, puis les anciens fichiers.
+  const link = { postId: owner.post_id, position: owner.position };
+  for (const row of [rootRow, ...members]) {
+    await rewriteJson(env.MEDIA, row, { r2Key: keys.media, thumbR2Key: keys.thumb, duplicateOf: row === owner ? null : link });
+  }
+  await db.batch([
+    db
+      .prepare("UPDATE media SET r2_key = ?, thumb_r2_key = ?, duplicate_post_id = NULL, duplicate_position = NULL, fingerprint = ? WHERE post_id = ? AND position = ?")
+      .bind(keys.media, keys.thumb, rootRow.fingerprint, owner.post_id, owner.position),
+    ...[rootRow, ...members.filter((m) => m !== owner)].map((row) =>
+      db
+        .prepare("UPDATE media SET r2_key = ?, thumb_r2_key = ?, duplicate_post_id = ?, duplicate_position = ?, fingerprint = NULL WHERE post_id = ? AND position = ?")
+        .bind(keys.media, keys.thumb, owner.post_id, owner.position, row.post_id, row.position),
+    ),
+  ]);
+  const old = [rootKey, rootRow.thumb_r2_key].filter((k): k is string => k !== null && k !== keys.media && k !== keys.thumb);
+  const unused: string[] = [];
+  for (const key of old) if (!(await keyInUseElsewhere(db, key, ""))) unused.push(key);
+  if (unused.length > 0) await env.MEDIA.delete(unused);
+
+  log.info("doublon réorienté vers la première occurrence", { original: `${owner.post_id}#${owner.position}`, avant: `${rootRow.post_id}#${rootRow.position}` });
+  return true;
+}
+
+/** Le média racine d'un groupe (l'original), tel que `reassignRoot` l'attend. Une requête D1. */
+export async function groupRoot(db: D1Database, postId: string, position: number): Promise<GroupRow | null> {
+  return db.prepare(`${SELECT} WHERE m.post_id = ? AND m.position = ?`).bind(postId, position).first<GroupRow>();
+}
+
+/** Donne des groupes à leur fiche la plus ancienne, dans la limite du budget D1 de l'appel. */
+export async function reassignBatch(env: Env, creatorId: string, budget = REASSIGN_QUERY_BUDGET): Promise<{ moved: number; remaining: number }> {
   const roots = await rootsToMove(env, creatorId);
   let moved = 0;
   let spent = 0;
   for (const rootRow of roots) {
-    const { results: members } = await env.DB
-      .prepare(`${SELECT} WHERE m.duplicate_post_id = ? AND m.duplicate_position = ? AND p.status = 'active'`)
-      .bind(rootRow.post_id, rootRow.position)
-      .all<GroupRow>();
-    const cost = 5 + members.length;
-    if (moved > 0 && spent + cost > REASSIGN_QUERY_BUDGET) break;
-    spent += cost + 1;
-
-    const owner = [...members].sort(earlier)[0];
-    if (!owner || earlier(owner, rootRow) >= 0 || !rootRow.r2_key) continue;
-    const rootKey = rootRow.r2_key;
-
-    // Nouvelles clés sous la fiche la plus ancienne, sans écraser un fichier existant.
-    let slot = owner.position;
-    const keysAt = (s: number) => ({
-      media: mediaKey(owner.prefix, s, extOf(rootKey)),
-      thumb: rootRow.thumb_r2_key ? thumbKey(owner.prefix, s, extOf(rootRow.thumb_r2_key)) : null,
-    });
-    for (let i = 0; i < 5; i++) {
-      const k = keysAt(slot);
-      if (!(await env.MEDIA.head(k.media)) && !(k.thumb && (await env.MEDIA.head(k.thumb)))) break;
-      slot += 100;
-    }
-    const keys = keysAt(slot);
-    if (!(await copy(env.MEDIA, rootKey, keys.media))) continue;
-    if (rootRow.thumb_r2_key && keys.thumb && !(await copy(env.MEDIA, rootRow.thumb_r2_key, keys.thumb))) keys.thumb = null;
-
-    // post.json d'abord, puis la base, puis les anciens fichiers.
-    const link = { postId: owner.post_id, position: owner.position };
-    for (const row of [rootRow, ...members]) {
-      await rewriteJson(env.MEDIA, row, { r2Key: keys.media, thumbR2Key: keys.thumb, duplicateOf: row === owner ? null : link });
-    }
-    const statements = [
-      env.DB
-        .prepare("UPDATE media SET r2_key = ?, thumb_r2_key = ?, duplicate_post_id = NULL, duplicate_position = NULL, fingerprint = ? WHERE post_id = ? AND position = ?")
-        .bind(keys.media, keys.thumb, rootRow.fingerprint, owner.post_id, owner.position),
-      ...[rootRow, ...members.filter((m) => m !== owner)].map((row) =>
-        env.DB
-          .prepare("UPDATE media SET r2_key = ?, thumb_r2_key = ?, duplicate_post_id = ?, duplicate_position = ?, fingerprint = NULL WHERE post_id = ? AND position = ?")
-          .bind(keys.media, keys.thumb, owner.post_id, owner.position, row.post_id, row.position),
-      ),
-    ];
-    await env.DB.batch(statements);
-    const old = [rootKey, rootRow.thumb_r2_key].filter((k): k is string => k !== null && k !== keys.media && k !== keys.thumb);
-    const unused: string[] = [];
-    for (const key of old) if (!(await keyInUseElsewhere(env.DB, key, ""))) unused.push(key);
-    if (unused.length > 0) await env.MEDIA.delete(unused);
-
-    log.info("doublon réorienté vers la première occurrence", { original: `${owner.post_id}#${owner.position}`, avant: `${rootRow.post_id}#${rootRow.position}` });
-    moved++;
+    if (moved > 0 && spent + 8 > budget) break;
+    spent += 8;
+    if (await reassignRoot(env, env.DB, rootRow)) moved++;
   }
   return { moved, remaining: Math.max(0, roots.length - moved) };
 }

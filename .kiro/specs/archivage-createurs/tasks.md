@@ -98,6 +98,12 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 9.8 Ménage par créateur depuis la page Créateurs (repris de memento-local le 2026-10-11) : route `POST /api/creators/<id>/duplicates` par lots, suppression des fiches entièrement en double, fenêtre de simulation, confirmation et bilan. Tests. _Exig. 9.10_
 - [x] 9.9 Quasi-doublons par empreinte visuelle et second regard pixel à pixel (repris de memento-local L10.10 à L10.13, commit 1df88b2, le 2026-10-11) : migration 0005, `fingerprint.ts` sur la liaison Images (`rgb`), reconnaissance à l'archivage, ménage par créateur avec calcul des empreintes par lots, relogement des doublons déjà reliés, `VISUAL_DEDUPE_THRESHOLD`. Tests (`test/visual.test.ts`). _Exig. 9.11_
 - [x] 9.10 Première occurrence (repris de memento-local L10.14, commit 4da3d16, le 2026-10-11) : `planOwnership`, `reassignBatch`, étape de réorientation dans le ménage, nombre d'images déplacées dans la fenêtre. Tests. _Exig. 9.12_
+- [x] 9.11 Fiches écartées : migration 0006 (`discarded_posts`), enregistrement à la suppression, collecte qui les ignore, effacement avec le créateur. _Exig. 9.13_
+- [x] 9.12 Première occurrence dès l'archivage (réorientation d'un groupe vers une fiche plus ancienne nouvellement archivée). _Exig. 9.14_
+- [x] 9.13 Reconnaissance avant téléchargement par la miniature de la plateforme. _Exig. 9.16_
+- [x] 9.14 Vidéos : empreinte de la miniature, règle stricte, ménage compris. _Exig. 9.18_
+- [x] 9.15 Maintenance planifiée (second déclencheur Cron) : empreintes par lots et ménage sans suppression, créateur par créateur. _Exig. 9.15, 9.17_
+- [x] 9.16 Tests : `test/dedupe-improvements.test.ts` (fiches écartées, première occurrence à l'archivage, reconnaissance avant téléchargement, vidéos, maintenance) et `test/fake-images.ts`.
 - [ ] 9.7 Appliquer la migration 0004 en production et lancer le rattrapage (simulation, puis application).
 
 ## Miniatures fabriquées (repris de memento-local v0.5.1 le 2026-10-05)

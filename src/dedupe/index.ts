@@ -2,6 +2,7 @@ import { log } from "../lib/log";
 import { isObject, type JsonObject } from "../lib/json";
 import {
   dedupeCandidates,
+  discardPosts,
   dependentsOf,
   getMedia,
   keyInUseElsewhere,
@@ -30,6 +31,7 @@ import {
   type Fingerprint,
   type PixelSample,
 } from "./fingerprint";
+import { mimeFromKey } from "./similar";
 
 /**
  * Médias identiques (exigence 9) : relogement des doublons avant un effacement, rattrapage des doublons déjà
@@ -228,6 +230,9 @@ async function applyLink(env: Env, link: DuplicateLink): Promise<boolean> {
   return true;
 }
 
+/** Relie un média pendant la maintenance planifiée (même règle que le ménage). */
+export const applyLinkForMaintenance = (env: Env, link: DuplicateLink): Promise<boolean> => applyLink(env, link);
+
 export interface DedupeProgress {
   /** Doublons trouvés (avant ce lot). */
   found: number;
@@ -264,28 +269,35 @@ export const FINGERPRINT_BATCH = 15;
 /** Seconds regards par plan : chacun coûte au plus deux transformations Images. */
 export const MAX_PLAN_CONFIRMATIONS = 30;
 
-/** Calcule et conserve les empreintes manquantes des images d'un créateur, par lot ; renvoie le nombre qui reste. */
-export async function fingerprintBatch(env: Env, creatorId: string): Promise<{ computed: number; remaining: number }> {
+/**
+ * Calcule et conserve les empreintes manquantes d'un créateur, par lot ; renvoie le nombre qui reste. Image : empreinte
+ * du fichier ; vidéo : empreinte de sa miniature (9.18), chaîne vide si elle n'en a pas.
+ */
+export async function fingerprintBatch(env: Env, creatorId: string, limit = FINGERPRINT_BATCH): Promise<{ computed: number; remaining: number }> {
   const missing = `FROM media m JOIN posts p ON p.id = m.post_id
-     WHERE p.creator_id = ? AND m.kind = 'image' AND m.downloaded = 1 AND m.r2_key IS NOT NULL
+     WHERE p.creator_id = ? AND m.kind IN ('image', 'video') AND m.downloaded = 1 AND m.r2_key IS NOT NULL
        AND m.duplicate_post_id IS NULL AND m.fingerprint IS NULL`;
   const { results } = await env.DB
-    .prepare(`SELECT m.post_id, m.position, m.r2_key, m.mime_type, m.bytes ${missing} LIMIT ?`)
-    .bind(creatorId, FINGERPRINT_BATCH)
-    .all<{ post_id: string; position: number; r2_key: string; mime_type: string | null; bytes: number | null }>();
+    .prepare(`SELECT m.post_id, m.position, m.kind, m.r2_key, m.thumb_r2_key, m.mime_type, m.bytes ${missing} LIMIT ?`)
+    .bind(creatorId, limit)
+    .all<{ post_id: string; position: number; kind: string; r2_key: string; thumb_r2_key: string | null; mime_type: string | null; bytes: number | null }>();
   for (const row of results) {
-    const print = await fingerprintOf({ images: env.IMAGES, bucket: env.MEDIA, key: row.r2_key, mimeType: row.mime_type, bytes: row.bytes });
+    const video = row.kind === "video";
+    const key = video ? row.thumb_r2_key : row.r2_key;
+    const print = key
+      ? await fingerprintOf({ images: env.IMAGES, bucket: env.MEDIA, key, mimeType: video ? mimeFromKey(key) : row.mime_type, bytes: video ? null : row.bytes })
+      : null;
     await env.DB
       .prepare("UPDATE media SET fingerprint = ? WHERE post_id = ? AND position = ?")
       .bind(print ? toHex(print) : "", row.post_id, row.position)
       .run();
   }
-  if (results.length < FINGERPRINT_BATCH) return { computed: results.length, remaining: 0 };
+  if (results.length < limit) return { computed: results.length, remaining: 0 };
   const left = await env.DB.prepare(`SELECT COUNT(*) AS n ${missing}`).bind(creatorId).first<{ n: number }>();
   return { computed: results.length, remaining: left?.n ?? 0 };
 }
 
-type Candidate = Pick<MediaRow, "post_id" | "position" | "kind" | "r2_key" | "etag" | "bytes" | "mime_type" | "width" | "height" | "fingerprint">;
+type Candidate = Pick<MediaRow, "post_id" | "position" | "kind" | "r2_key" | "thumb_r2_key" | "etag" | "bytes" | "mime_type" | "width" | "height" | "fingerprint">;
 
 /**
  * Plan complet d'un créateur (exigences 9.9 et 9.11).
@@ -299,7 +311,7 @@ type Candidate = Pick<MediaRow, "post_id" | "position" | "kind" | "r2_key" | "et
 export async function planCreatorDuplicates(env: Env, creatorId: string, threshold: number): Promise<DuplicateLink[]> {
   const { results: rows } = await env.DB
     .prepare(
-      `SELECT m.post_id, m.position, m.kind, m.r2_key, m.etag, m.bytes, m.mime_type, m.width, m.height, m.fingerprint
+      `SELECT m.post_id, m.position, m.kind, m.r2_key, m.thumb_r2_key, m.etag, m.bytes, m.mime_type, m.width, m.height, m.fingerprint
        FROM media m JOIN posts p ON p.id = m.post_id
        WHERE p.creator_id = ? AND m.downloaded = 1 AND m.r2_key IS NOT NULL AND m.duplicate_post_id IS NULL
        ORDER BY p.rowid, m.position`,
@@ -347,7 +359,7 @@ export async function planCreatorDuplicates(env: Env, creatorId: string, thresho
   if (threshold > 0 && env.IMAGES) {
     const prints = new Map<Candidate, Fingerprint>();
     for (const c of unique) {
-      const print = c.kind === "image" ? fromHex(c.fingerprint) : null;
+      const print = c.kind === "image" || c.kind === "video" ? fromHex(c.fingerprint) : null;
       if (print) prints.set(c, print);
     }
     const order = (c: Candidate) => rows.indexOf(c);
@@ -356,7 +368,10 @@ export async function planCreatorDuplicates(env: Env, creatorId: string, thresho
     let confirmations = 0;
     const sampleOf = async (c: Candidate) => {
       if (!samples.has(c)) {
-        samples.set(c, await pixelSampleOf({ images: env.IMAGES, bucket: env.MEDIA, key: c.r2_key ?? "", mimeType: c.mime_type, bytes: c.bytes }));
+        // Une vidéo se compare par sa miniature (9.18).
+        const key = (c.kind === "video" ? c.thumb_r2_key : c.r2_key) ?? "";
+        const video = c.kind === "video";
+        samples.set(c, await pixelSampleOf({ images: env.IMAGES, bucket: env.MEDIA, key, mimeType: video ? mimeFromKey(key) : c.mime_type, bytes: video ? null : c.bytes }));
       }
       return samples.get(c) ?? null;
     };
@@ -374,13 +389,14 @@ export async function planCreatorDuplicates(env: Env, creatorId: string, thresho
       const near: { head: Candidate; bits: number }[] = [];
       for (const h of heads) {
         const other = prints.get(h);
-        if (other && sameAspect(c, h)) near.push({ head: h, bits: distance(print, other) });
+        if (other && h.kind === c.kind && sameAspect(c, h)) near.push({ head: h, bits: distance(print, other) });
       }
       near.sort((a, b) => a.bits - b.bits);
       let match: { head: Candidate; bits: number } | null = null;
       for (const n of near) {
-        if (n.bits > CONFIRM_MAX_BITS) break;
-        if (n.bits <= threshold || (await confirmed(c, n.head))) {
+        // Vidéo : écart d'au plus le seuil et second regard toujours exigé (9.18).
+        if (n.bits > (c.kind === "video" ? threshold : CONFIRM_MAX_BITS)) break;
+        if ((c.kind === "image" && n.bits <= threshold) || (await confirmed(c, n.head))) {
           match = n;
           break;
         }
@@ -407,7 +423,7 @@ export { planOwnership, reassignBatch, type RedundantPost } from "./owner";
 export const REDUNDANT_BATCH = 3;
 
 /** Supprime ces fiches (fichiers propres, index, publication). Une fiche dont un fichier sert encore à une autre est laissée. */
-export async function deleteRedundantPosts(env: Env, posts: RedundantPost[]): Promise<{ deleted: number; kept: number }> {
+export async function deleteRedundantPosts(env: Env, posts: RedundantPost[], creatorId?: string): Promise<{ deleted: number; kept: number }> {
   const safe: RedundantPost[] = [];
   for (const post of posts) {
     const own = (await env.MEDIA.list({ prefix: post.prefix, limit: 100 })).objects.map((o) => o.key);
@@ -417,6 +433,8 @@ export async function deleteRedundantPosts(env: Env, posts: RedundantPost[]): Pr
     else safe.push(post);
   }
   // Les médias d'une fiche superflue sont tous des doublons : aucun autre média n'en dépend, pas de relogement.
+  // Retenues d'abord : une collecte qui les retrouverait ne les archivera plus (exigence 9.13).
+  if (creatorId) await discardPosts(env.DB, creatorId, safe.map((p) => p.id), new Date().toISOString());
   await purgePosts(env, safe.map((p) => ({ id: p.id, r2_prefix: p.prefix })), { rehome: false });
   for (const post of safe) log.info("fiche en double supprimée", { post: post.id });
   return { deleted: safe.length, kept: posts.length - safe.length };
@@ -480,7 +498,7 @@ export async function dedupeCreator(env: Env, creatorId: string, apply: boolean)
     // Un lot de groupes a changé de fiche : l'appel suivant reprendra (réorientation, puis suppression).
   } else {
     // Plus rien à réorienter (ou un groupe impossible à déplacer) : les fiches entièrement en double partent.
-    const r = await deleteRedundantPosts(env, redundant.slice(0, REDUNDANT_BATCH));
+    const r = await deleteRedundantPosts(env, redundant.slice(0, REDUNDANT_BATCH), creatorId);
     out.deletedPosts = r.deleted;
     out.done = redundant.length <= REDUNDANT_BATCH || r.deleted === 0;
   }

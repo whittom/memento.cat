@@ -12,6 +12,8 @@ export interface Config {
   mastodonUserAgent: string;
   /** Écart d'empreinte maximal (bits sur 256) pour relier un quasi-doublon ; 0 désactive la reconnaissance visuelle. */
   visualDedupeThreshold: number;
+  /** Maintenance planifiée des doublons (empreintes, liens, réorientation ; jamais de suppression). */
+  autoDedupe: boolean;
 }
 
 /** Valeur neutre : chaque installation devrait la remplacer par un nom qui la désigne (MASTODON_USER_AGENT). */
@@ -42,5 +44,6 @@ export function readConfig(env: Env): Config {
     redditUserAgent: env.REDDIT_USER_AGENT ?? "",
     mastodonUserAgent: env.MASTODON_USER_AGENT || DEFAULT_MASTODON_USER_AGENT,
     visualDedupeThreshold: threshold(env.VISUAL_DEDUPE_THRESHOLD),
+    autoDedupe: (env.AUTO_DEDUPE ?? "true") !== "false",
   };
 }
