@@ -14,6 +14,7 @@ import {
 import { postJsonKey } from "../storage/keys";
 import { putJson } from "../storage/r2";
 import { readConfig } from "../lib/config";
+import { planOwnership, reassignBatch, type RedundantPost } from "./owner";
 import { purgePosts } from "../purge";
 import {
   CONFIRM_MAX_BITS,
@@ -400,38 +401,10 @@ export async function planCreatorDuplicates(env: Env, creatorId: string, thresho
 
 // ---------- Ménage d'un créateur depuis la page Créateurs (exigence 9.10) ----------
 
-/** Une publication dont tous les médias sont des doublons (déjà reliés, ou que le plan relie) : sa fiche est superflue. */
-export interface RedundantPost {
-  id: string;
-  prefix: string;
-}
+export { planOwnership, reassignBatch, type RedundantPost } from "./owner";
 
 /** Fiches supprimées par appel : chacune coûte une liste R2, une vérification par fichier et environ cinq requêtes D1. */
 export const REDUNDANT_BATCH = 3;
-
-/**
- * Les fiches à supprimer pour un créateur : celles dont **tous** les médias sont des doublons d'une première
- * occurrence. Une galerie qui garde au moins un média propre reste entière, doublons liés compris. Une requête D1.
- */
-export async function planRedundantPosts(env: Env, creatorId: string, links: DuplicateLink[]): Promise<RedundantPost[]> {
-  const planned = new Set(links.map((l) => `${l.duplicate.postId}#${l.duplicate.position}`));
-  const { results } = await env.DB
-    .prepare(
-      `SELECT p.id, p.r2_prefix AS prefix, m.position, m.duplicate_post_id AS dup
-         FROM posts p JOIN media m ON m.post_id = p.id
-        WHERE p.creator_id = ? AND p.status = 'active'
-        ORDER BY p.rowid, m.position`,
-    )
-    .bind(creatorId)
-    .all<{ id: string; prefix: string; position: number; dup: string | null }>();
-  const byPost = new Map<string, { prefix: string; all: boolean }>();
-  for (const r of results) {
-    const entry = byPost.get(r.id) ?? { prefix: r.prefix, all: true };
-    if (r.dup === null && !planned.has(`${r.id}#${r.position}`)) entry.all = false;
-    byPost.set(r.id, entry);
-  }
-  return [...byPost].filter(([, v]) => v.all).map(([id, v]) => ({ id, prefix: v.prefix }));
-}
 
 /** Supprime ces fiches (fichiers propres, index, publication). Une fiche dont un fichier sert encore à une autre est laissée. */
 export async function deleteRedundantPosts(env: Env, posts: RedundantPost[]): Promise<{ deleted: number; kept: number }> {
@@ -452,28 +425,34 @@ export async function deleteRedundantPosts(env: Env, posts: RedundantPost[]): Pr
 export interface CreatorDedupe {
   /** Empreintes visuelles encore à calculer avant de pouvoir chiffrer le plan (la galerie rappelle en attendant). */
   pendingFingerprints: number;
-  /** Médias encore à relier à leur première occurrence (ou à la meilleure image du groupe). */
+  /** Médias encore à relier à un original. */
   count: number;
   /** Dont quasi-doublons (même image, autre encodage). */
   visualCount: number;
   freeableBytes: number;
+  /** Groupes dont le média passera à la fiche publiée la première (exigence 9.12). */
+  moves: number;
   /** Fiches dont tous les médias sont (ou seront) des doublons. */
   postCount: number;
   linked: number;
+  reassigned: number;
   deletedPosts: number;
   /** Vrai quand il ne reste rien à faire : la galerie arrête alors ses appels. */
   done: boolean;
 }
 
 /**
- * Ménage des doublons d'un créateur, par lots (exigences 9.10 et 9.11). Chaque appel, simulation comprise, calcule
+ * Ménage des doublons d'un créateur, par lots (exigences 9.10 à 9.12). Chaque appel, simulation comprise, calcule
  * d'abord au plus FINGERPRINT_BATCH empreintes manquantes : tant qu'il en reste, il ne renvoie que leur nombre. Puis,
- * sans `apply`, il chiffre le plan ; avec `apply`, il relie au plus DEDUPE_BATCH médias, et quand il n'en reste plus,
- * supprime au plus REDUNDANT_BATCH fiches entièrement en double. La galerie rappelle jusqu'à la fin.
+ * sans `apply`, il chiffre le plan ; avec `apply`, il fait une étape à la fois, dans cet ordre : relier au plus
+ * DEDUPE_BATCH médias ; donner des groupes à leur fiche publiée la première ; supprimer au plus REDUNDANT_BATCH fiches
+ * entièrement en double. La galerie rappelle jusqu'à la fin.
  */
 export async function dedupeCreator(env: Env, creatorId: string, apply: boolean): Promise<CreatorDedupe> {
   const threshold = readConfig(env).visualDedupeThreshold;
-  const out: CreatorDedupe = { pendingFingerprints: 0, count: 0, visualCount: 0, freeableBytes: 0, postCount: 0, linked: 0, deletedPosts: 0, done: false };
+  const out: CreatorDedupe = {
+    pendingFingerprints: 0, count: 0, visualCount: 0, freeableBytes: 0, moves: 0, postCount: 0, linked: 0, reassigned: 0, deletedPosts: 0, done: false,
+  };
 
   if (threshold > 0 && env.IMAGES) {
     const prints = await fingerprintBatch(env, creatorId);
@@ -484,23 +463,27 @@ export async function dedupeCreator(env: Env, creatorId: string, apply: boolean)
   }
 
   const plan = await planCreatorDuplicates(env, creatorId, threshold);
-  const redundant = await planRedundantPosts(env, creatorId, plan);
+  const { redundant, moves } = await planOwnership(env.DB, creatorId, plan);
   out.count = plan.length;
   out.visualCount = plan.filter((l) => l.reason === "visuel").length;
   out.freeableBytes = plan.reduce((n, l) => n + l.bytes, 0);
+  out.moves = moves;
   out.postCount = redundant.length;
-  out.done = plan.length === 0 && redundant.length === 0;
+  out.done = plan.length === 0 && moves === 0 && redundant.length === 0;
   if (!apply || out.done) return out;
 
   if (plan.length > 0) {
     for (const link of plan.slice(0, DEDUPE_BATCH)) if (await applyLink(env, link)) out.linked++;
     // Rien relié alors qu'il en restait : on s'arrête plutôt que de boucler.
     out.done = out.linked === 0;
+  } else if (moves > 0 && (out.reassigned = (await reassignBatch(env, creatorId)).moved) > 0) {
+    // Un lot de groupes a changé de fiche : l'appel suivant reprendra (réorientation, puis suppression).
   } else {
+    // Plus rien à réorienter (ou un groupe impossible à déplacer) : les fiches entièrement en double partent.
     const r = await deleteRedundantPosts(env, redundant.slice(0, REDUNDANT_BATCH));
     out.deletedPosts = r.deleted;
     out.done = redundant.length <= REDUNDANT_BATCH || r.deleted === 0;
   }
-  log.info("ménage des doublons", { creator: creatorId, relies: out.linked, fiches: out.deletedPosts });
+  log.info("ménage des doublons", { creator: creatorId, relies: out.linked, reorientes: out.reassigned, fiches: out.deletedPosts });
   return out;
 }

@@ -210,12 +210,18 @@ describe("ménage visuel d'un créateur (exigences 9.10, 9.11)", () => {
     expect(await dedupeCreator(env, A, false)).toMatchObject({ pendingFingerprints: 0, count: 0, done: true });
   });
 
-  it("garde la meilleure image du groupe, relie l'autre et supprime la fiche devenue superflue", async () => {
-    const { env, sqlite, row } = await archiveOf([[{ seed: 1 }], [{ seed: 1, flip: 3, w: 2000, h: 1600 }], [{ seed: 2 }]]);
-    expect(await simulate(env)).toMatchObject({ count: 1, visualCount: 1, postCount: 1 });
+  it("garde le meilleur fichier, mais sous la fiche publiée la première, et supprime la plus récente (9.12)", async () => {
+    const { env, sqlite, row, media: r2 } = await archiveOf([[{ seed: 1 }], [{ seed: 1, flip: 3, w: 2000, h: 1600 }], [{ seed: 2 }]]);
+    expect(await simulate(env)).toMatchObject({ count: 1, visualCount: 1, moves: 1, postCount: 1 });
     await runAll(env);
-    expect(sqlite.prepare("SELECT id FROM posts ORDER BY rowid").all().map((r) => r["id"])).toEqual(["bluesky:a2", "bluesky:a3"]);
-    expect(row("bluesky:a2")).toMatchObject({ duplicate_post_id: null });
+    expect(sqlite.prepare("SELECT id FROM posts ORDER BY rowid").all().map((r) => r["id"])).toEqual(["bluesky:a1", "bluesky:a3"]);
+    const kept = row("bluesky:a1");
+    expect(kept).toMatchObject({ duplicate_post_id: null });
+    expect(String(kept?.["r2_key"])).toMatch(/^bluesky\/a\/2026\/09\/1\//);
+    // Le fichier gardé est le meilleur (2000 × 1600), recopié sous la fiche la plus ancienne.
+    expect(JSON.parse(new TextDecoder().decode(r2.files.get(String(kept?.["r2_key"]))))).toMatchObject({ w: 2000 });
+    expect([...r2.files.keys()].some((k) => k.startsWith("bluesky/a/2026/09/2/"))).toBe(false);
+    expect(await dedupeCreator(env, A, false)).toMatchObject({ count: 0, moves: 0, postCount: 0, done: true });
   });
 
   it("second regard au ménage, et relie à la nouvelle image les doublons déjà reliés à l'ancienne", async () => {
@@ -229,8 +235,20 @@ describe("ménage visuel d'un créateur (exigences 9.10, 9.11)", () => {
     sqlite.prepare("UPDATE media SET duplicate_post_id = 'bluesky:a1', duplicate_position = 0, r2_key = ? WHERE post_id = 'bluesky:a3' AND position = 0").run(a1?.["r2_key"] as string);
     expect(await simulate(env)).toMatchObject({ count: 1, visualCount: 1 });
     await runAll(env);
-    expect(row("bluesky:a3")).toMatchObject({ duplicate_post_id: "bluesky:a2", r2_key: row("bluesky:a2")?.["r2_key"] });
-    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM posts WHERE id = 'bluesky:a1'").get()?.["n"]).toBe(0);
+    // Le groupe revient à la fiche 1 (publiée la première) ; la copie de la fiche 3 la suit ; la fiche 2 part.
+    expect(row("bluesky:a1")).toMatchObject({ duplicate_post_id: null });
+    expect(row("bluesky:a3")).toMatchObject({ duplicate_post_id: "bluesky:a1", r2_key: row("bluesky:a1")?.["r2_key"] });
+    expect(row("bluesky:a3", 1)).toMatchObject({ duplicate_post_id: null });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM posts WHERE id = 'bluesky:a2'").get()?.["n"]).toBe(0);
+  });
+
+  it("copies exactes : la fiche publiée la première garde le média, même archivée après", async () => {
+    const { env, sqlite, row } = await archiveOf([[{ seed: 1 }], [{ seed: 1 }]], 0);
+    sqlite.prepare("UPDATE posts SET published_at = '2026-09-20T12:00:00.000Z' WHERE id = 'bluesky:a1'").run();
+    expect(await simulate(env)).toMatchObject({ count: 1, moves: 1, postCount: 1 });
+    await runAll(env);
+    expect(sqlite.prepare("SELECT id FROM posts").all().map((r) => r["id"])).toEqual(["bluesky:a2"]);
+    expect(String(row("bluesky:a2")?.["r2_key"])).toMatch(/^bluesky\/a\/2026\/09\/2\//);
   });
 
   it("sans liaison Images ou avec le seuil à 0, seules les copies identiques sont traitées", async () => {

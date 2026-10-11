@@ -125,7 +125,7 @@ for (let r; !r || r.remaining > 0; ) {
 
 Ajouter `"creator": "<id>"` au corps pour se limiter à un créateur.
 
-Plus simple : sur la page **Créateurs**, « Supprimer les doublons… » simule pour ce créateur (médias à relier, fiches entièrement en double, espace libérable), demande confirmation, puis fait le ménage avec sa progression. **Seule la première occurrence de chaque média est conservée** : les fiches dont toutes les images sont déjà dans une fiche plus ancienne sont supprimées définitivement ; une galerie qui garde au moins une image propre reste entière. Une sauvegarde (rclone, ci-dessous) est conseillée avant l'application.
+Plus simple : sur la page **Créateurs**, « Supprimer les doublons… » simule pour ce créateur (médias à relier, fiches entièrement en double, espace libérable), demande confirmation, puis fait le ménage avec sa progression. **Seule la première occurrence de chaque média est conservée** : la fiche publiée la première garde l'image (le meilleur fichier du groupe, recopié sous elle au besoin), et les fiches dont toutes les images sont déjà dans une fiche plus ancienne sont supprimées définitivement ; une galerie qui garde au moins une image propre reste entière. Une sauvegarde (rclone, ci-dessous) est conseillée avant l'application.
 
 ## Miniatures
 

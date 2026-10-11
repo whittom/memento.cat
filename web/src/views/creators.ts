@@ -379,6 +379,7 @@ function openDuplicatesDialog(c: Creator, refresh: () => void): void {
         plan.count > 0
           ? `${plural(plan.count, "média en double sera relié", "médias en double seront reliés")} à sa première occurrence${plan.visualCount > 0 ? ` (dont ${plural(plan.visualCount, "quasi-doublon", "quasi-doublons")} : même image, autre encodage ; la meilleure est gardée)` : ""}, ${fmtBytes(plan.freeableBytes)} libérés.`
           : null,
+        plan.moves > 0 ? `${plural(plan.moves, "image passera", "images passeront")} à la fiche publiée la première.` : null,
       ].filter(Boolean);
       summary.textContent = `${parts.join(" ")} Seule la première occurrence de chaque média est conservée. La suppression est définitive.`;
       applyBtn.disabled = false;
@@ -393,6 +394,7 @@ function openDuplicatesDialog(c: Creator, refresh: () => void): void {
     close.disabled = true;
     let linked = 0;
     let deleted = 0;
+    let moved = 0;
     result.textContent = "Suppression en cours…";
     try {
       for (;;) {
@@ -402,12 +404,13 @@ function openDuplicatesDialog(c: Creator, refresh: () => void): void {
           continue;
         }
         linked += r.linked;
+        moved += r.reassigned;
         deleted += r.deletedPosts;
         changed = true;
-        result.textContent = `En cours : ${plural(linked, "média relié", "médias reliés")}, ${plural(deleted, "fiche supprimée", "fiches supprimées")}…`;
+        result.textContent = `En cours : ${plural(linked, "média relié", "médias reliés")}, ${plural(moved, "image déplacée", "images déplacées")}, ${plural(deleted, "fiche supprimée", "fiches supprimées")}…`;
         if (r.done) break;
       }
-      const text = `${plural(deleted, "fiche supprimée", "fiches supprimées")}, ${plural(linked, "média relié", "médias reliés")}.`;
+      const text = `${plural(deleted, "fiche supprimée", "fiches supprimées")}, ${plural(linked, "média relié", "médias reliés")}${moved > 0 ? `, ${plural(moved, "image déplacée", "images déplacées")} vers la fiche publiée la première` : ""}.`;
       result.textContent = text;
       toast(`${c.handle} : ${text}`);
       close.textContent = "Fermer";
