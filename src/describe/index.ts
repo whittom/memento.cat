@@ -90,7 +90,12 @@ async function askModel(env: Env, model: string, dataUrl: string): Promise<strin
   if (res.status === 402) throw new HttpError(502, "Crédits Hugging Face épuisés pour ce mois");
   if (res.status === 429) throw new HttpError(429, "Quota Hugging Face atteint, réessayez plus tard");
   if (res.status === 404) throw new HttpError(502, `Modèle introuvable ou non servi : ${model}`);
-  if (!res.ok) throw new HttpError(502, `Le modèle n'a pas répondu (HTTP ${res.status})`);
+  if (!res.ok) {
+    // La raison donnée par Hugging Face ou le fournisseur (sans le jeton, qui n'y figure jamais) aide à corriger.
+    const detail = providerError(await res.text().catch(() => ""));
+    log.warn("description refusée par le modèle", { model, status: res.status, detail });
+    throw new HttpError(502, `Le modèle a refusé la requête (HTTP ${res.status})${detail ? ` : ${detail}` : ""}`);
+  }
   const body: unknown = await res.json().catch(() => null);
   const message = obj(obj(arr(obj(isObject(body) ? body : null)?.["choices"])[0])?.["message"]);
   const content = message?.["content"];
@@ -98,6 +103,20 @@ async function askModel(env: Env, model: string, dataUrl: string): Promise<strin
   const cleaned = cleanDescription(text);
   if (!cleaned) throw new HttpError(502, "Le modèle a renvoyé une description vide");
   return cleaned;
+}
+
+/** Message d'erreur d'une réponse du routeur Hugging Face (`{ error: "…" }` ou `{ error: { message } }`), borné à 300 caractères. */
+export function providerError(body: string): string {
+  let message = body;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    const error = isObject(parsed) ? parsed["error"] : undefined;
+    message = typeof error === "string" ? error : (str(obj(isObject(error) ? error : null)?.["message"]) ?? body);
+  } catch {
+    // corps non JSON : gardé tel quel
+  }
+  const text = message.replace(/\s+/g, " ").trim();
+  return text.length > 300 ? `${text.slice(0, 299)}…` : text;
 }
 
 /** La description conservée d'un média, ou null. */

@@ -111,3 +111,12 @@ describe("description d'un média par IA (exigence 11)", () => {
     expect(cleanDescription("x".repeat(3000))).toHaveLength(2000);
   });
 });
+
+describe("raison d'un refus du modèle", () => {
+  it("extrait le message d'erreur du routeur Hugging Face", async () => {
+    const { providerError } = await import("../src/describe");
+    expect(providerError('{"error":{"message":"Model does not support image input","type":"invalid_request_error"}}')).toBe("Model does not support image input");
+    expect(providerError('{"error":"Bad request: messages too long"}')).toBe("Bad request: messages too long");
+    expect(providerError("texte brut")).toBe("texte brut");
+  });
+});
