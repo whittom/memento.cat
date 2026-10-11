@@ -37,6 +37,9 @@ export function presentPost(row: PostListRow, media: MediaRow[]) {
       viewed: m.viewed_at !== null,
       sourceUrl: m.source_url,
       duplicateOf: m.duplicate_post_id ? { postId: m.duplicate_post_id, position: m.duplicate_position ?? 0 } : null,
+      aiDescription: m.ai_description && m.ai_description_model && m.ai_description_at
+        ? { text: m.ai_description, model: m.ai_description_model, at: m.ai_description_at }
+        : null,
     })),
   };
 }

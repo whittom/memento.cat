@@ -104,16 +104,22 @@ Chaque tâche renvoie aux exigences de `requirements.md`. Les étiquettes `v0.N`
 - [x] 9.14 Vidéos : empreinte de la miniature, règle stricte, ménage compris. _Exig. 9.18_
 - [x] 9.15 Maintenance planifiée (second déclencheur Cron) : empreintes par lots et ménage sans suppression, créateur par créateur. _Exig. 9.15, 9.17_
 - [x] 9.16 Tests : `test/dedupe-improvements.test.ts` (fiches écartées, première occurrence à l'archivage, reconnaissance avant téléchargement, vidéos, maintenance) et `test/fake-images.ts`.
-- [ ] 9.7 Appliquer la migration 0004 en production et lancer le rattrapage (simulation, puis application).
+- [x] 9.7 Appliquer la migration 0004 en production et lancer le rattrapage (simulation, puis application). Migrations 0004 à 0006 appliquées ; rattrapage déclaré fait par l'utilisateur le 2026-10-11.
 
 ## Miniatures fabriquées (repris de memento-local v0.5.1 le 2026-10-05)
 - [x] 10.1 Liaison Images (`wrangler.example.jsonc`, types), `makeThumbnail` et branchement dans `archivePost`. _Exig. 10.1 à 10.4_
 - [x] 10.2 Tests (fausse liaison Images, base SQLite réelle) : `test/thumbnail.test.ts`. _Exig. 10.1 à 10.3_
-- [ ] 10.3 Après déploiement : archiver une image sans miniature et vérifier la tuile ; surveiller le quota de transformations.
+- [x] 10.3 Après déploiement : archiver une image sans miniature et vérifier la tuile ; surveiller le quota de transformations. Déclarée faite par l'utilisateur le 2026-10-11.
+
+## Description d'un média par IA (demandée le 2026-10-11)
+- [x] 11.1 Migration 0007, module `src/describe/` (image réduite par la liaison Images, appel à Hugging Face Inference Providers, nettoyage), route `POST /api/posts/<id>/media/<position>/describe`, `post.json`, recherche, reconstruction de l'index. _Exig. 11.1 à 11.7_
+- [x] 11.2 Visionneuse : « Décrire avec l'IA », description conservée avec sa provenance, « Régénérer ». _Exig. 11.4, 11.5_
+- [x] 11.3 Tests (faux service Hugging Face) : `test/describe.test.ts`.
+- [ ] 11.4 Créer le jeton Hugging Face et l'enregistrer comme secret du Worker (`npx wrangler secret put HF_TOKEN`) ; choisir le modèle (`HF_VISION_MODEL`) et l'essayer sur quelques images.
 
 ## Phase 6 — Mise en service → `v1.0`
 - [x] 6.1 Cloudflare Access devant la galerie et l'API (application auto-hébergée sur le domaine, politique limitée au propriétaire) ; une requête sans jeton est redirigée vers la connexion Access. _Exig. 4.7_
-- [ ] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, à faire.
+- [x] 6.2 Déploiement (fait le 2026-09-30 sur `memento.cat`) ; suivi des journaux sur une semaine, déclaré fait par l'utilisateur le 2026-10-11.
 - [x] 6.3 Exportation complète vers un dossier local et procédure de sauvegarde (rclone, voir README). _Exig. 7.2_
 - [ ] 6.5 Premier passage réel sur Bluesky et Reddit : valider les correspondances sur des réponses réelles.
-- [ ] 6.4 Point sur le volume R2 (Q3).
+- [x] 6.4 Point sur le volume R2 (Q3). Déclaré fait par l'utilisateur le 2026-10-11.

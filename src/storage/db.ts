@@ -72,11 +72,15 @@ export interface MediaRow {
   duplicate_position: number | null;
   /** Empreinte visuelle (64 caractères hexadécimaux), chaîne vide si non calculable, NULL si pas encore calculée. */
   fingerprint: string | null;
+  /** Description générée par IA, à la demande (exigence 11), avec son modèle et sa date. */
+  ai_description: string | null;
+  ai_description_model: string | null;
+  ai_description_at: string | null;
 }
 
 /** Ligne de média à insérer ; le lien vers un original est facultatif (nul par défaut). */
-export type MediaInsert = Omit<MediaRow, "viewed_at" | "duplicate_post_id" | "duplicate_position" | "fingerprint"> &
-  Partial<Pick<MediaRow, "duplicate_post_id" | "duplicate_position" | "fingerprint">>;
+type OptionalMedia = "duplicate_post_id" | "duplicate_position" | "fingerprint" | "ai_description" | "ai_description_model" | "ai_description_at";
+export type MediaInsert = Omit<MediaRow, "viewed_at" | OptionalMedia> & Partial<Pick<MediaRow, OptionalMedia>>;
 
 /** Médias non consultés qui comptent : téléchargés, et qui ne sont pas des doublons (exigence 9.7). */
 const UNVIEWED = "m.viewed_at IS NULL AND m.downloaded = 1 AND m.duplicate_post_id IS NULL";
@@ -242,20 +246,21 @@ export async function insertPost(
     db.prepare("DELETE FROM posts_fts WHERE post_id = ?").bind(post.id),
     db
       .prepare("INSERT INTO posts_fts (post_id, title, text, media_descriptions) VALUES (?, ?, ?, ?)")
-      .bind(post.id, post.title ?? "", post.text, media.map((m) => m.description ?? "").join("\n")),
+      .bind(post.id, post.title ?? "", post.text, media.map((m) => `${m.description ?? ""} ${m.ai_description ?? ""}`.trim()).join("\n")),
     ...media.map((m) =>
       db
         .prepare(
           `INSERT OR IGNORE INTO media
              (post_id, position, kind, mime_type, r2_key, etag, bytes, width, height,
               thumb_r2_key, thumb_width, thumb_height, description, source_url, downloaded,
-              duplicate_post_id, duplicate_position, fingerprint)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              duplicate_post_id, duplicate_position, fingerprint, ai_description, ai_description_model, ai_description_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           m.post_id, m.position, m.kind, m.mime_type, m.r2_key, m.etag, m.bytes, m.width, m.height,
           m.thumb_r2_key, m.thumb_width, m.thumb_height, m.description, m.source_url, m.downloaded,
           m.duplicate_post_id ?? null, m.duplicate_position ?? null, m.fingerprint ?? null,
+          m.ai_description ?? null, m.ai_description_model ?? null, m.ai_description_at ?? null,
         ),
     ),
   ];

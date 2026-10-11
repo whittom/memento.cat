@@ -76,6 +76,7 @@ function bucket(): FakeBucket {
         return new Response(data).body;
       },
       json: () => Promise.resolve(JSON.parse(new TextDecoder().decode(data)) as unknown),
+      arrayBuffer: () => Promise.resolve(data.slice().buffer),
     };
   };
   const b = {

@@ -15,7 +15,7 @@ const A = "bluesky:did:plc:a";
 const config: Config = {
   requireAccess: false, accessTeamDomain: "", accessAud: "",
   maxSubrequestsPerRun: 100, maxQueriesPerRun: 1000, maxPagesPerCreator: 3, maxMediaBytes: 100_000_000, rateLimitFloor: 10,
-  redditUserAgent: "", mastodonUserAgent: "memento (test)", visualDedupeThreshold: 6, autoDedupe: true,
+  redditUserAgent: "", mastodonUserAgent: "memento (test)", visualDedupeThreshold: 6, autoDedupe: true, hfVisionModel: "test/modele",
 };
 
 const img = (url: string, thumb: string | null = null, w = 1000, h = 800): NormalizedMedia => ({

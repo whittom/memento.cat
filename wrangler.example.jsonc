@@ -51,6 +51,9 @@
     "VISUAL_DEDUPE_THRESHOLD": "6",
     // Maintenance planifiée des doublons (empreintes de l'archive existante, liens, réorientation ; jamais de suppression).
     "AUTO_DEDUPE": "true",
+    // Description d'un média par IA (exigence 11) : modèle image-texte de Hugging Face. Le jeton est un secret :
+    // `npx wrangler secret put HF_TOKEN` (jamais dans ce fichier).
+    "HF_VISION_MODEL": "Qwen/Qwen3.8-27B",
     // Pour Reddit : "<plateforme>:<id app>:<version> (by /u/<utilisateur>)"
     "REDDIT_USER_AGENT": "",
     // Nom qui identifie cette installation auprès des serveurs Mastodon, par exemple "monsite.exemple (archive personnelle en lecture seule)".

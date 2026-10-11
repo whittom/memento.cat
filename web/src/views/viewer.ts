@@ -159,6 +159,42 @@ export function openViewer(opts: ViewerOptions): Viewer {
     });
   }
 
+  /**
+   * Description par IA (exigence 11) : générée à la demande, puis conservée et affichée avec sa provenance.
+   * Une vidéo se décrit par sa miniature ; sans image disponible, rien n'est proposé.
+   */
+  function aiDescriptionBlock(post: Post, media: Media): HTMLElement | null {
+    const describable = media.kind === "video" ? !!media.thumbUrl : !!(media.url || media.thumbUrl);
+    if (!describable) return null;
+    const status = h("p", { class: "viewer-ai-status", role: "status" });
+    const run = async (button: HTMLButtonElement, regenerate: boolean) => {
+      button.disabled = true;
+      status.textContent = "Description en cours…";
+      try {
+        media.aiDescription = await api.describe(post.id, media.position, regenerate);
+        opts.onChange(post);
+        render();
+      } catch (e) {
+        status.textContent = e instanceof Error ? e.message : "Description impossible.";
+        button.disabled = false;
+      }
+    };
+    const title = "L'image est envoyée à un modèle hébergé par Hugging Face pour être décrite.";
+    if (media.aiDescription) {
+      const ai = media.aiDescription;
+      const again: HTMLButtonElement = h("button", { type: "button", class: "btn btn-quiet btn-small", title, onclick: () => void run(again, true) }, "Régénérer");
+      return h(
+        "div",
+        { class: "viewer-ai" },
+        h("p", {}, h("strong", {}, "Description générée par IA : "), ai.text),
+        h("p", { class: "viewer-ai-meta" }, `Modèle ${ai.model}, le ${fmtDateTime(ai.at)}. Peut contenir des erreurs.`, " ", again),
+        status,
+      );
+    }
+    const button: HTMLButtonElement = h("button", { type: "button", class: "btn btn-quiet btn-small", title, onclick: () => void run(button, false) }, "Décrire avec l'IA");
+    return h("div", { class: "viewer-ai" }, button, status);
+  }
+
   function renderInfo(post: Post, media: Media | undefined): void {
     setChildren(
       info,
@@ -168,6 +204,7 @@ export function openViewer(opts: ViewerOptions): Viewer {
       post.title ? h("h2", { class: "viewer-title" }, post.title) : null,
       post.text ? h("p", { class: "viewer-body-text" }, post.text) : null,
       media?.description ? h("p", { class: "viewer-alt" }, h("strong", {}, "Description du média : "), media.description) : null,
+      media ? aiDescriptionBlock(post, media) : null,
       h(
         "dl",
         { class: "viewer-meta" },

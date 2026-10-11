@@ -14,7 +14,12 @@ export interface Config {
   visualDedupeThreshold: number;
   /** Maintenance planifiée des doublons (empreintes, liens, réorientation ; jamais de suppression). */
   autoDedupe: boolean;
+  /** Modèle image-texte de Hugging Face pour la description par IA (exigence 11). */
+  hfVisionModel: string;
 }
+
+/** Modèle par défaut de la description par IA : vision-langage, licence Apache 2.0, servi par plusieurs fournisseurs. */
+export const DEFAULT_HF_VISION_MODEL = "Qwen/Qwen3.8-27B";
 
 /** Valeur neutre : chaque installation devrait la remplacer par un nom qui la désigne (MASTODON_USER_AGENT). */
 export const DEFAULT_MASTODON_USER_AGENT = "memento (archive personnelle en lecture seule)";
@@ -45,5 +50,6 @@ export function readConfig(env: Env): Config {
     mastodonUserAgent: env.MASTODON_USER_AGENT || DEFAULT_MASTODON_USER_AGENT,
     visualDedupeThreshold: threshold(env.VISUAL_DEDUPE_THRESHOLD),
     autoDedupe: (env.AUTO_DEDUPE ?? "true") !== "false",
+    hfVisionModel: env.HF_VISION_MODEL?.trim() || DEFAULT_HF_VISION_MODEL,
   };
 }

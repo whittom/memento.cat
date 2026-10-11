@@ -31,6 +31,14 @@ export interface Media {
   sourceUrl: string;
   /** Média identique à celui d'une autre publication du même créateur (l'original). */
   duplicateOf: { postId: string; position: number } | null;
+  /** Description générée par IA, à la demande (exigence 11), distincte de celle du créateur. */
+  aiDescription: AiDescription | null;
+}
+
+export interface AiDescription {
+  text: string;
+  model: string;
+  at: string;
 }
 
 export interface Post {

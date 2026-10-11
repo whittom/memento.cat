@@ -134,6 +134,20 @@ Ajouter `"creator": "<id>"` au corps pour se limiter à un créateur.
 
 Plus simple : sur la page **Créateurs**, « Supprimer les doublons… » simule pour ce créateur (médias à relier, fiches entièrement en double, espace libérable), demande confirmation, puis fait le ménage avec sa progression. **Seule la première occurrence de chaque média est conservée** : la fiche publiée la première garde l'image (le meilleur fichier du groupe, recopié sous elle au besoin), et les fiches dont toutes les images sont déjà dans une fiche plus ancienne sont supprimées définitivement ; une galerie qui garde au moins une image propre reste entière. Une sauvegarde (rclone, ci-dessous) est conseillée avant l'application.
 
+## Description par IA
+
+Dans la visionneuse, « Décrire avec l'IA » demande à un modèle image-texte hébergé par Hugging Face une description factuelle de l'image, en français (pour une vidéo, de sa miniature). Elle est générée seulement au clic, puis conservée à part, avec le modèle et la date, sans jamais remplacer le texte du créateur, et elle est incluse dans la recherche. « Régénérer » en demande une nouvelle.
+
+Mise en route :
+1. Sur https://huggingface.co/settings/tokens, créez un jeton à grain fin avec la seule permission « Make calls to Inference Providers ».
+2. Enregistrez-le comme secret du Worker (la commande vous le demande ; il n'est jamais écrit dans un fichier) :
+   ```
+   npx wrangler secret put HF_TOKEN
+   ```
+3. Le modèle se règle par `HF_VISION_MODEL` dans `wrangler.example.jsonc` (`Qwen/Qwen3.8-27B` par défaut). Il doit accepter des images (tâche « image-text-to-text ») et être servi par au moins un fournisseur d'Inference Providers.
+
+L'image, réduite à 1024 px, est envoyée au fournisseur choisi par Hugging Face. Les appels sont facturés sur votre compte Hugging Face (crédits mensuels inclus, puis à l'usage).
+
 ## Miniatures
 
 Quand une plateforme ne fournit pas de miniature (images Reddit, par exemple), memento en fabrique une à l'archivage : l'image réduite à 480 px au plus, en WebP, rangée à côté de l'original (`media_NN.thumb.webp`). La galerie charge cette miniature dans les tuiles et ne charge l'original que dans la visionneuse. Elle est fabriquée par la liaison Cloudflare Images (`images` dans `wrangler.example.jsonc`) : aucun réglage de zone, 5 000 transformations uniques gratuites par mois. Au-delà, ou pour une image de plus de 20 Mo, l'image reste sans miniature et la tuile charge l'original. Les images archivées avant cette fonction ne reçoivent pas de miniature.

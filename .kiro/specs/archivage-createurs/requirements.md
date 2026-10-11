@@ -163,6 +163,19 @@ Reprise de l'exigence L12 de memento-local (v0.5.1), avec la liaison Cloudflare 
 4. LA miniature DOIT être enregistrée comme les autres (`thumb_r2_key`, `thumb_width`, `thumb_height`, `post.json`), donc survivre à la reconstruction de l'index.
 5. LA galerie DOIT utiliser la miniature dans les tuiles ; la visionneuse garde l'original.
 
+## Exigence 11 — Description d'un média par IA
+**Récit :** En tant qu'utilisateur, je veux obtenir, à la demande, une description textuelle d'une image (ou d'une vidéo, par sa miniature) quand le créateur n'en a pas fourni, pour la retrouver par la recherche.
+
+Demandée le 2026-10-11.
+
+1. QUAND l'utilisateur clique sur « Décrire avec l'IA » dans la visionneuse, LE SYSTÈME DOIT envoyer l'image (une version réduite, au plus 1024 px, en JPEG) à un modèle image-texte hébergé par Hugging Face (Inference Providers, API compatible OpenAI) et afficher la description obtenue, en français.
+2. LE modèle DOIT être configurable (`HF_VISION_MODEL`, `Qwen/Qwen3.8-27B` par défaut) ; le jeton d'accès (`HF_TOKEN`) est un secret du Worker, jamais versionné ni envoyé à la galerie.
+3. LA description DOIT être générée **à la demande seulement** (jamais pendant la collecte), puis **conservée dans un champ séparé** (`ai_description`, avec le modèle et la date), sans jamais remplacer le texte alternatif du créateur. Elle est écrite dans `post.json` et incluse dans la recherche plein texte.
+4. LA visionneuse DOIT afficher une description conservée avec la mention « Générée par IA » et le modèle, distincte de celle du créateur, et proposer « Régénérer ».
+5. Pour une vidéo, LE SYSTÈME DOIT décrire sa miniature ; sans miniature, le bouton n'est pas proposé.
+6. SI le jeton manque, est refusé, si les crédits sont épuisés, si le quota est atteint ou si le modèle ne répond pas, ALORS LE SYSTÈME DOIT afficher un message explicite et ne rien conserver.
+7. LE texte renvoyé par le modèle DOIT être nettoyé (raisonnement `<think>` retiré, espaces superflus) et limité à 2 000 caractères.
+
 ## Questions ouvertes
 - **Q1 — Reddit.** Tranchée le 2026-09-28 : Reddit conservé, sans purge en v1. Reprise le 2026-10-01 : la purge est implémentée (exigence 5.5), ce qui supprime l'écart avec les conditions Reddit. Reste la fréquence : la vérification est à la demande (exigence 5.2) et Reddit recommande de supprimer sous 48 heures ; tant qu'aucune vérification n'est lancée, une publication supprimée à la source reste dans l'archive. Option à évaluer si Reddit l'exige : vérification planifiée limitée à Reddit.
 - **Q2 — Bluesky et le contenu supprimé.** Vérifier dans les conditions développeur de Bluesky si la conservation d'une publication supprimée est permise. Le choix de ne pas purger s'applique aussi à Bluesky en v1.

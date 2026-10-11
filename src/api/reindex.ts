@@ -51,6 +51,7 @@ export async function reindexBatch(env: Env, cursor: string | undefined): Promis
       const kind = str(o["kind"]);
       const duplicateOf = obj(o["duplicateOf"]);
       const originalPost = str(duplicateOf?.["postId"]);
+      const ai = obj(o["aiDescription"]);
       return {
         post_id: id,
         position,
@@ -69,6 +70,9 @@ export async function reindexBatch(env: Env, cursor: string | undefined): Promis
         downloaded: bool(o["downloaded"]) ? 1 : 0,
         duplicate_post_id: originalPost ?? null,
         duplicate_position: originalPost ? (num(duplicateOf?.["position"]) ?? 0) : null,
+        ai_description: str(ai?.["text"]) ?? null,
+        ai_description_model: str(ai?.["model"]) ?? null,
+        ai_description_at: str(ai?.["at"]) ?? null,
       };
     });
     await insertPost(env.DB, post, prefix, media, capturedAt);

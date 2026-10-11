@@ -248,6 +248,16 @@ Repris de memento-local (§ 19 de sa conception), adapté au Worker : liaisons D
 - **Coût :** le plan gratuit de Cloudflare Images offre 5 000 transformations uniques par mois ; la liaison facture chaque combinaison source et paramètres une fois par mois. Au-delà, la transformation échoue et l'image reste sans miniature (exigence 10.3).
 - **Non repris :** le script de rattrapage `npm run thumbnails` de memento-local. Les images déjà archivées sans miniature le restent ; la tuile charge l'original.
 
+## Description d'un média par IA (exigence 11)
+- **Service :** Hugging Face Inference Providers, point d'accès compatible OpenAI `https://router.huggingface.co/v1/chat/completions`, appelé par le Worker (jamais par la galerie : la politique de contenu ne change pas, le jeton ne quitte pas le Worker). Modèle `HF_VISION_MODEL` (`Qwen/Qwen3.8-27B` par défaut, servi en direct par plusieurs fournisseurs au 2026-10-11) ; jeton `HF_TOKEN`, secret du Worker (`npx wrangler secret put HF_TOKEN`), avec la permission « Make calls to Inference Providers ».
+- **Image envoyée :** lue dans R2, réduite à 1024 px au plus en JPEG par la liaison Images, puis envoyée en adresse `data:` (base64) : la galerie est derrière Cloudflare Access, le fournisseur ne pourrait pas la télécharger lui-même. Sans liaison Images, l'original est envoyé s'il fait moins de 4 Mo. Une vidéo est décrite par sa miniature.
+- **Consigne :** une description factuelle en français, de deux à quatre phrases (sujet, décor, couleurs et lumière, texte visible), sans invention. La réponse est nettoyée (`<think>` retiré) et bornée à 2 000 caractères.
+- **Migration `0007_descriptions_ia.sql` :** `media.ai_description`, `ai_description_model`, `ai_description_at`. Le texte alternatif du créateur (`description`) n'est jamais modifié.
+- **Route `POST /api/posts/<id>/media/<position>/describe` (`{ regenerate }`) :** rend la description conservée sans appel, sauf `regenerate`. Sinon : appel au modèle, puis `post.json` (`aiDescription`), puis, en une transaction, la ligne `media` et l'entrée de recherche (`refreshSearchIndex` : descriptions du créateur et de l'IA). `insertPost` et `reindexBatch` les reprennent.
+- **Erreurs :** jeton absent (503), refusé (502), crédits épuisés (402 du fournisseur, rendu 502), quota (429), modèle non servi (404, rendu 502) : message explicite, rien n'est conservé.
+- **Galerie :** dans la visionneuse, « Décrire avec l'IA » (l'infobulle prévient que l'image est envoyée à Hugging Face), puis la description dans un cadre pointillé avec « Générée par IA », le modèle, la date et « Régénérer ».
+- **Confidentialité :** l'image quitte Cloudflare pour le fournisseur choisi par Hugging Face ; seulement au clic, jamais pendant la collecte.
+
 ## Erreurs et observabilité
 - Classes d'erreur typées par cause (quota, introuvable, plateforme).
 - Journaux JSON structurés par créateur et par exécution ; observabilité Workers activée.

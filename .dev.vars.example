@@ -2,3 +2,5 @@
 REQUIRE_ACCESS=false
 REDDIT_CLIENT_ID=
 REDDIT_CLIENT_SECRET=
+# Jeton Hugging Face (permission « Make calls to Inference Providers »), pour la description par IA.
+HF_TOKEN=

@@ -1,4 +1,4 @@
-import type { Creator, Filters, Post } from "./types";
+import type { AiDescription, Creator, Filters, Post } from "./types";
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
@@ -54,6 +54,8 @@ export const api = {
     if (cursor) q.set("cursor", cursor);
     return request<{ posts: Post[]; nextCursor: string | null }>(`/posts?${q.toString()}`);
   },
+  describe: (postId: string, position: number, regenerate: boolean) =>
+    request<{ aiDescription: AiDescription }>(`/posts/${enc(postId)}/media/${position}/describe`, post({ regenerate })).then((r) => r.aiDescription),
   post: (id: string) => request<{ post: Post }>(`/posts/${enc(id)}`).then((r) => r.post),
   setViewed: (scope: "media" | "post" | "creator", id: string, viewed: boolean, position?: number) =>
     request<{ changed: number }>("/views", post({ scope, id, viewed, position })),

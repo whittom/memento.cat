@@ -21,6 +21,7 @@ import {
   type CreatorWithCounts,
 } from "../storage/db";
 import { dedupeBatch, dedupeCreator } from "../dedupe";
+import { describeMedia } from "../describe";
 import { verifyBatch } from "../verify";
 import { decodeCursor, encodeCursor, json, parseDay, readBody } from "./http";
 import { presentPost } from "./present";
@@ -168,6 +169,14 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   }
 
   // ---- Publications ----
+  // Description d'un média par IA, à la demande (exigence 11) : POST /api/posts/<id>/media/<position>/describe.
+  if (parts[0] === "posts" && parts[1] && parts[2] === "media" && parts[4] === "describe" && method === "POST") {
+    const position = Number.parseInt(parts[3] ?? "", 10);
+    if (!Number.isInteger(position) || position < 0) throw new HttpError(400, "Position de média invalide");
+    const body = await readBody(request);
+    return json({ aiDescription: await describeMedia(env, parts[1], position, bool(body["regenerate"]) === true) });
+  }
+
   if (parts[0] === "posts" && method === "GET") {
     if (parts[1]) {
       const row = await getVisiblePost(env.DB, parts[1]);

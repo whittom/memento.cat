@@ -14,7 +14,7 @@ const A = "bluesky:did:plc:a";
 const config = (visualDedupeThreshold = 6): Config => ({
   requireAccess: false, accessTeamDomain: "", accessAud: "",
   maxSubrequestsPerRun: 100, maxQueriesPerRun: 1000, maxPagesPerCreator: 3, maxMediaBytes: 100_000_000, rateLimitFloor: 10,
-  redditUserAgent: "", mastodonUserAgent: "memento (test)", visualDedupeThreshold, autoDedupe: false,
+  redditUserAgent: "", mastodonUserAgent: "memento (test)", visualDedupeThreshold, autoDedupe: false, hfVisionModel: "test/modele",
 });
 
 const media = (url: string, w: number | null = null, h: number | null = null): NormalizedMedia => ({
