@@ -169,7 +169,7 @@ Reprise de l'exigence L12 de memento-local (v0.5.1), avec la liaison Cloudflare 
 Demandée le 2026-10-11.
 
 1. QUAND l'utilisateur clique sur « Décrire avec l'IA » dans la visionneuse, LE SYSTÈME DOIT envoyer l'image (une version réduite, au plus 1024 px, en JPEG) à un modèle image-texte hébergé par Hugging Face (Inference Providers, API compatible OpenAI) et afficher la description obtenue, en français.
-2. LE modèle DOIT être configurable (`HF_VISION_MODEL`, `Qwen/Qwen3.8-27B` par défaut) ; le jeton d'accès (`HF_TOKEN`) est un secret du Worker, jamais versionné ni envoyé à la galerie.
+2. LE modèle DOIT être configurable (`HF_VISION_MODEL`, `google/gemma-4-26B-A4B-it:deepinfra` par défaut) ; le jeton d'accès (`HF_TOKEN`) est un secret du Worker, jamais versionné ni envoyé à la galerie.
 3. LA description DOIT être générée **à la demande seulement** (jamais pendant la collecte), puis **conservée dans un champ séparé** (`ai_description`, avec le modèle et la date), sans jamais remplacer le texte alternatif du créateur. Elle est écrite dans `post.json` et incluse dans la recherche plein texte.
 4. LA visionneuse DOIT afficher une description conservée avec la mention « Générée par IA » et le modèle, distincte de celle du créateur, et proposer « Régénérer ».
 5. Pour une vidéo, LE SYSTÈME DOIT décrire sa miniature ; sans miniature, le bouton n'est pas proposé.

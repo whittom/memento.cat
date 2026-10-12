@@ -144,7 +144,7 @@ Mise en route :
    ```
    npx wrangler secret put HF_TOKEN
    ```
-3. Le modèle se règle par `HF_VISION_MODEL` dans `wrangler.example.jsonc` (`Qwen/Qwen3.8-27B` par défaut). Il doit accepter des images (tâche « image-text-to-text ») et être servi par au moins un fournisseur d'Inference Providers.
+3. Le modèle se règle par `HF_VISION_MODEL` dans `wrangler.example.jsonc` (`google/gemma-4-26B-A4B-it:deepinfra` par défaut). Il doit accepter des images (tâche « image-text-to-text ») et être servi par au moins un fournisseur d'Inference Providers.
 
 L'image, réduite à 1024 px, est envoyée au fournisseur choisi par Hugging Face. Les appels sont facturés sur votre compte Hugging Face (crédits mensuels inclus, puis à l'usage).
 
