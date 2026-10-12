@@ -73,6 +73,64 @@ async function imageDataUrl(env: Env, key: string, mimeType: string | null): Pro
   return `data:${mimeType ?? "image/jpeg"};base64,${toBase64(new Uint8Array(await again.arrayBuffer()))}`;
 }
 
+/**
+ * Jeton nettoyé : espaces, retours à la ligne, guillemets, BOM et préfixe « Bearer » retirés. Un secret collé dans un
+ * terminal en emporte souvent un de trop, et le moindre caractère de contrôle fait rejeter la requête en amont.
+ */
+export function cleanToken(raw: string | undefined): string {
+  let t = (raw ?? "").trim();
+  t = t.replace(/^bearer\s+/i, "").replace(/^["']+|["']+$/g, "");
+  // On ne garde que les caractères ASCII imprimables et sans espace : le moindre autre fait rejeter la requête en amont.
+  return [...t].filter((c) => c.charCodeAt(0) > 32 && c.charCodeAt(0) < 127).join("");
+}
+
+/** Forme d'un jeton, pour le diagnostic : jamais sa valeur. */
+export function describeToken(raw: string | undefined): Record<string, unknown> {
+  const t = raw ?? "";
+  const clean = cleanToken(t);
+  return {
+    present: t.length > 0,
+    longueurBrute: t.length,
+    longueurNettoyee: clean.length,
+    commenceParHf: clean.startsWith("hf_"),
+    formeValide: /^hf_[A-Za-z0-9]{20,}$/.test(clean),
+    caracteresDeTrop: t.length - clean.length,
+  };
+}
+
+/**
+ * Diagnostic de la liaison avec Hugging Face, depuis le Worker (route d'administration) : isole le chemin réseau, le
+ * jeton et l'image. Ne rend que des codes HTTP, des noms d'en-têtes et la forme du jeton, jamais sa valeur.
+ */
+export async function diagnoseHuggingFace(env: Env): Promise<Record<string, unknown>> {
+  const probe = async (label: string, run: () => Promise<Response>) => {
+    try {
+      const res = await run();
+      const text = await res.text().catch(() => "");
+      return { essai: label, statut: res.status, enTetes: [...res.headers.keys()].join(","), corps: text.slice(0, 200) };
+    } catch (e) {
+      return { essai: label, erreur: e instanceof Error ? e.message : String(e) };
+    }
+  };
+  const token = cleanToken(env.HF_TOKEN);
+  const chat = (auth: string, content: unknown) => () =>
+    fetch(HF_CHAT_URL, {
+      method: "POST",
+      headers: { authorization: `Bearer ${auth}`, "content-type": "application/json" },
+      body: JSON.stringify({ model: readConfig(env).hfVisionModel, max_tokens: 5, messages: [{ role: "user", content }] }),
+    });
+  return {
+    jeton: describeToken(env.HF_TOKEN),
+    modele: readConfig(env).hfVisionModel,
+    essais: [
+      await probe("1. liste publique (chemin réseau)", () => fetch("https://huggingface.co/api/models?limit=1")),
+      await probe("2. message texte, jeton bidon (réponse attendue : 401)", chat("hf_" + "x".repeat(34), "Réponds par un mot.")),
+      await probe("3. message texte, votre jeton nettoyé, sans image", chat(token, "Réponds par un mot.")),
+      await probe("4. votre jeton brut tel qu'enregistré, sans image", chat(env.HF_TOKEN ?? "", "Réponds par un mot.")),
+    ],
+  };
+}
+
 /** Fournisseurs essayés au plus, l'un après l'autre, quand le routeur refuse la requête sans en choisir un bon. */
 const MAX_PROVIDERS = 4;
 
@@ -140,8 +198,11 @@ export async function liveProviders(model: string): Promise<string[]> {
  * après l'autre. Rend la description et le modèle effectivement utilisé.
  */
 async function askModel(env: Env, model: string, dataUrl: string): Promise<{ text: string; model: string }> {
-  const token = env.HF_TOKEN;
+  const token = cleanToken(env.HF_TOKEN);
   if (!token) throw new HttpError(503, "Description par IA non configurée : ajoutez le secret HF_TOKEN au Worker");
+  if (!/^hf_[A-Za-z0-9]{20,}$/.test(token)) {
+    throw new HttpError(503, "HF_TOKEN mal formé : il doit ressembler à hf_ suivi de lettres et de chiffres, sans espace ni guillemets");
+  }
 
   const first = await callModel(token, model, dataUrl);
   if (first.ok) return { text: first.text, model };

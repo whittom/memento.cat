@@ -21,7 +21,7 @@ import {
   type CreatorWithCounts,
 } from "../storage/db";
 import { dedupeBatch, dedupeCreator } from "../dedupe";
-import { describeMedia } from "../describe";
+import { describeMedia, diagnoseHuggingFace } from "../describe";
 import { verifyBatch } from "../verify";
 import { decodeCursor, encodeCursor, json, parseDay, readBody } from "./http";
 import { presentPost } from "./present";
@@ -226,6 +226,12 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   if (parts[0] === "admin" && parts[1] === "reindex" && method === "POST") {
     const body = await readBody(request);
     return json(await reindexBatch(env, str(body["cursor"])));
+  }
+
+  // Diagnostic de la description par IA : codes et en-têtes seulement, jamais le jeton.
+  if (parts[0] === "admin" && parts[1] === "describe-check" && method === "POST") {
+    await readBody(request);
+    return json(await diagnoseHuggingFace(env));
   }
 
   if (parts[0] === "admin" && parts[1] === "dedupe" && method === "POST") {

@@ -8,6 +8,7 @@ import { localEnv } from "./local-env";
 
 const NOW = "2026-10-11T12:00:00.000Z";
 const A = "bluesky:did:plc:a";
+const TOKEN = "hf_" + "t".repeat(34);
 
 /** Faux service Hugging Face : rend la réponse indiquée et note chaque appel. */
 function hugging(reply: { status?: number; content?: unknown } = {}) {
@@ -20,7 +21,7 @@ function hugging(reply: { status?: number; content?: unknown } = {}) {
   return calls;
 }
 
-async function setup(vars: Record<string, string | undefined> = { HF_TOKEN: "hf_test" }) {
+async function setup(vars: Record<string, string | undefined> = { HF_TOKEN: TOKEN }) {
   const ctx = localEnv();
   Object.assign(ctx.env, { IMAGES: fakeImages().images, HF_VISION_MODEL: "test/modele", ...vars });
   await insertCreator(ctx.env.DB, { id: A, platform: "bluesky", handle: "a.test", displayName: null }, NOW);
@@ -53,7 +54,7 @@ describe("description d'un média par IA (exigence 11)", () => {
     const d = await describeMedia(env, "bluesky:a1", 0, false, NOW);
     expect(d).toEqual({ text: "Un phare blanc au bord d'une falaise, sous un ciel orageux.", model: "test/modele", at: NOW });
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ url: HF_CHAT_URL, auth: "Bearer hf_test", body: { model: "test/modele" } });
+    expect(calls[0]).toMatchObject({ url: HF_CHAT_URL, auth: `Bearer ${TOKEN}`, body: { model: "test/modele" } });
     expect(calls[0]?.body.messages[0]?.content[1]?.image_url?.url).toMatch(/^data:image\/jpeg;base64,/);
     // Le texte du créateur est intact ; la description IA est à part, dans la base et dans post.json.
     expect(get(0)).toMatchObject({ description: "Texte du créateur", ai_description: d.text, ai_description_model: "test/modele" });
@@ -142,7 +143,7 @@ describe("refus du routeur : raison et repli sur un fournisseur (v0.1.25)", () =
   });
 
   it("donne la raison lue dans les en-têtes quand tout échoue, sans repli si le fournisseur est imposé", async () => {
-    const { env } = await setup({ HF_TOKEN: "hf_test", HF_VISION_MODEL: "test/modele:novita" });
+    const { env } = await setup({ HF_TOKEN: TOKEN, HF_VISION_MODEL: "test/modele:novita" });
     let calls = 0;
     vi.stubGlobal("fetch", () => {
       calls++;
@@ -153,5 +154,38 @@ describe("refus du routeur : raison et repli sur un fournisseur (v0.1.25)", () =
       message: expect.stringContaining("x-error-message: image input not supported") as string,
     });
     expect(calls).toBe(1);
+  });
+});
+
+describe("jeton et diagnostic (v0.1.26)", () => {
+  it("nettoie un jeton collé avec des restes (espaces, guillemets, retour à la ligne, BOM, Bearer)", async () => {
+    const { cleanToken, describeToken } = await import("../src/describe");
+    const good = "hf_" + "a".repeat(34);
+    for (const raw of [good, ` ${good}\n`, `"${good}"`, `'${good}'\r\n`, `Bearer ${good}`, `﻿${good}`, `${good}\u0000`]) {
+      expect(cleanToken(raw)).toBe(good);
+    }
+    expect(describeToken(`${good}\n`)).toMatchObject({ present: true, formeValide: true, caracteresDeTrop: 1 });
+    expect(describeToken(undefined)).toMatchObject({ present: false, formeValide: false });
+    expect(JSON.stringify(describeToken(good))).not.toContain(good);
+  });
+
+  it("refuse un jeton mal formé avec un message clair, sans appeler Hugging Face", async () => {
+    const { env } = await setup({ HF_TOKEN: "pas-un-jeton" });
+    const calls = hugging();
+    await expect(describeMedia(env, "bluesky:a1", 0, false, NOW)).rejects.toMatchObject({ status: 503, message: expect.stringContaining("mal formé") as string });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("le diagnostic rend des codes et des noms d'en-têtes, jamais le jeton", async () => {
+    const token = "hf_" + "b".repeat(34);
+    const { env } = await setup({ HF_TOKEN: `${token}\n` });
+    vi.stubGlobal("fetch", (input: RequestInfo | URL) =>
+      Promise.resolve(String(input).includes("/api/models") ? Response.json([{ id: "x" }]) : new Response("{}", { status: 401, headers: { "x-error-message": "bad" } })),
+    );
+    const report = JSON.stringify(await (await import("../src/describe")).diagnoseHuggingFace(env));
+    expect(report).toContain('"statut":401');
+    expect(report).toContain("x-error-message");
+    expect(report).toContain('"caracteresDeTrop":1');
+    expect(report).not.toContain(token);
   });
 });
