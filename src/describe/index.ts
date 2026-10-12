@@ -73,10 +73,17 @@ async function imageDataUrl(env: Env, key: string, mimeType: string | null): Pro
   return `data:${mimeType ?? "image/jpeg"};base64,${toBase64(new Uint8Array(await again.arrayBuffer()))}`;
 }
 
-/** Appelle le modèle ; traduit ses erreurs en messages explicites (exigence 11.6). */
-async function askModel(env: Env, model: string, dataUrl: string): Promise<string> {
-  const token = env.HF_TOKEN;
-  if (!token) throw new HttpError(503, "Description par IA non configurée : ajoutez le secret HF_TOKEN au Worker");
+/** Fournisseurs essayés au plus, l'un après l'autre, quand le routeur refuse la requête sans en choisir un bon. */
+const MAX_PROVIDERS = 4;
+
+/** Résultat d'un appel : la description, ou le refus et sa raison. */
+type Attempt = { ok: true; text: string } | { ok: false; status: number; detail: string };
+
+/** En-têtes qui portent la raison d'un refus du routeur ou du fournisseur (aucun ne contient le jeton). */
+const ERROR_HEADERS = ["x-error-message", "x-error-code", "x-error-type", "x-inference-provider"];
+
+/** Un appel au routeur pour un modèle (éventuellement suffixé `:fournisseur`). */
+async function callModel(token: string, model: string, dataUrl: string): Promise<Attempt> {
   const res = await fetch(HF_CHAT_URL, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -89,21 +96,73 @@ async function askModel(env: Env, model: string, dataUrl: string): Promise<strin
   if (res.status === 401 || res.status === 403) throw new HttpError(502, "Jeton Hugging Face refusé : vérifiez HF_TOKEN et sa permission « Inference Providers »");
   if (res.status === 402) throw new HttpError(502, "Crédits Hugging Face épuisés pour ce mois");
   if (res.status === 429) throw new HttpError(429, "Quota Hugging Face atteint, réessayez plus tard");
-  if (res.status === 404) throw new HttpError(502, `Modèle introuvable ou non servi : ${model}`);
   if (!res.ok) {
-    // La raison donnée par Hugging Face ou le fournisseur (sans le jeton, qui n'y figure jamais) aide à corriger.
-    const detail = providerError(await res.text().catch(() => ""));
-    log.warn("description refusée par le modèle", { model, status: res.status, detail });
-    throw new HttpError(502, `Le modèle a refusé la requête (HTTP ${res.status})${detail ? ` : ${detail}` : ""}`);
+    // La raison donnée par Hugging Face ou le fournisseur, dans le corps ou dans les en-têtes.
+    const fromBody = providerError(await res.text().catch(() => ""));
+    const fromHeaders = ERROR_HEADERS.map((h) => (res.headers.get(h) ? `${h}: ${res.headers.get(h)}` : null)).filter(Boolean).join(" ; ");
+    const detail = [fromBody, fromHeaders].filter(Boolean).join(" ; ");
+    log.warn("description refusée par le modèle", { model, status: res.status, detail, headers: [...res.headers.keys()].join(",") });
+    return { ok: false, status: res.status, detail };
   }
   const body: unknown = await res.json().catch(() => null);
   const message = obj(obj(arr(obj(isObject(body) ? body : null)?.["choices"])[0])?.["message"]);
   const content = message?.["content"];
   const text = typeof content === "string" ? content : arr(content).map((part) => str(obj(part)?.["text"]) ?? "").join(" ");
   const cleaned = cleanDescription(text);
-  if (!cleaned) throw new HttpError(502, "Le modèle a renvoyé une description vide");
-  return cleaned;
+  if (!cleaned) return { ok: false, status: 200, detail: "description vide" };
+  return { ok: true, text: cleaned };
 }
+
+/**
+ * Fournisseurs en service pour un modèle, d'après l'API publique de Hugging Face (`inferenceProviderMapping`, objet ou
+ * liste selon la version), tâche conversationnelle seulement. Liste vide si l'API ne répond pas.
+ */
+export async function liveProviders(model: string): Promise<string[]> {
+  try {
+    const res = await fetch(`https://huggingface.co/api/models/${model}?expand[]=inferenceProviderMapping`);
+    if (!res.ok) return [];
+    const body: unknown = await res.json();
+    const mapping = isObject(body) ? body["inferenceProviderMapping"] : undefined;
+    const entries: { provider: string; status?: string; task?: string }[] = Array.isArray(mapping)
+      ? mapping.map((m) => ({ provider: str(obj(m)?.["provider"]) ?? "", status: str(obj(m)?.["status"]), task: str(obj(m)?.["task"]) }))
+      : isObject(mapping)
+        ? Object.entries(mapping).map(([provider, m]) => ({ provider, status: str(obj(m)?.["status"]), task: str(obj(m)?.["task"]) }))
+        : [];
+    return entries.filter((e) => e.provider && e.status !== "error" && e.status !== "staging" && (!e.task || e.task === "conversational")).map((e) => e.provider);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Appelle le modèle ; traduit ses erreurs en messages explicites (exigence 11.6). Si le routeur refuse la requête (400,
+ * 404, 422) et que le modèle n'impose pas de fournisseur (`modèle:fournisseur`), essaie les fournisseurs en service l'un
+ * après l'autre. Rend la description et le modèle effectivement utilisé.
+ */
+async function askModel(env: Env, model: string, dataUrl: string): Promise<{ text: string; model: string }> {
+  const token = env.HF_TOKEN;
+  if (!token) throw new HttpError(503, "Description par IA non configurée : ajoutez le secret HF_TOKEN au Worker");
+
+  const first = await callModel(token, model, dataUrl);
+  if (first.ok) return { text: first.text, model };
+  const failures = [`${model} : HTTP ${first.status}${first.detail ? ` (${first.detail})` : ""}`];
+
+  const retryable = [400, 404, 422].includes(first.status) && !model.includes(":");
+  if (retryable) {
+    for (const provider of (await liveProviders(model)).slice(0, MAX_PROVIDERS)) {
+      const named = `${model}:${provider}`;
+      const attempt = await callModel(token, named, dataUrl);
+      if (attempt.ok) {
+        log.info("description obtenue avec un fournisseur imposé", { model: named });
+        return { text: attempt.text, model: named };
+      }
+      failures.push(`${provider} : HTTP ${attempt.status}${attempt.detail ? ` (${attempt.detail})` : ""}`);
+    }
+  }
+  const summary = failures.join(" ; ");
+  throw new HttpError(502, `Le modèle a refusé la requête. ${summary.length > 600 ? `${summary.slice(0, 599)}…` : summary}`);
+}
+
 
 /** Message d'erreur d'une réponse du routeur Hugging Face (`{ error: "…" }` ou `{ error: { message } }`), borné à 300 caractères. */
 export function providerError(body: string): string {
@@ -146,8 +205,8 @@ export async function describeMedia(env: Env, postId: string, position: number, 
   if (!key) throw new HttpError(409, "Aucune image à décrire pour ce média");
   const mime = target.kind === "video" || !target.r2_key ? null : target.mime_type;
 
-  const model = readConfig(env).hfVisionModel;
-  const text = await askModel(env, model, await imageDataUrl(env, key, mime));
+  const answer = await askModel(env, readConfig(env).hfVisionModel, await imageDataUrl(env, key, mime));
+  const { text, model } = answer;
   const description: AiDescription = { text, model, at: now };
 
   // post.json d'abord (source de vérité), puis la base et l'index de recherche.

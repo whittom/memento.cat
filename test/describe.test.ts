@@ -120,3 +120,38 @@ describe("raison d'un refus du modèle", () => {
     expect(providerError("texte brut")).toBe("texte brut");
   });
 });
+
+describe("refus du routeur : raison et repli sur un fournisseur (v0.1.25)", () => {
+  it("essaie les fournisseurs en service l'un après l'autre et retient celui qui répond", async () => {
+    const { env, media } = await setup();
+    const models: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("https://huggingface.co/api/models/")) {
+        return Response.json({ inferenceProviderMapping: { novita: { status: "live", task: "conversational" }, deepinfra: { status: "live", task: "conversational" }, cerebras: { status: "error" } } });
+      }
+      const model = (JSON.parse(String(init?.body)) as { model: string }).model;
+      models.push(model);
+      if (model === "test/modele:deepinfra") return Response.json({ choices: [{ message: { content: "Un phare." } }] });
+      return new Response("", { status: 400, headers: { "x-error-message": "image input not supported" } });
+    });
+    const d = await describeMedia(env, "bluesky:a1", 0, false, NOW);
+    expect(models).toEqual(["test/modele", "test/modele:novita", "test/modele:deepinfra"]);
+    expect(d).toMatchObject({ text: "Un phare.", model: "test/modele:deepinfra" });
+    expect(media(0)).toMatchObject({ ai_description_model: "test/modele:deepinfra" });
+  });
+
+  it("donne la raison lue dans les en-têtes quand tout échoue, sans repli si le fournisseur est imposé", async () => {
+    const { env } = await setup({ HF_TOKEN: "hf_test", HF_VISION_MODEL: "test/modele:novita" });
+    let calls = 0;
+    vi.stubGlobal("fetch", () => {
+      calls++;
+      return Promise.resolve(new Response("", { status: 400, headers: { "x-error-message": "image input not supported" } }));
+    });
+    await expect(describeMedia(env, "bluesky:a1", 0, false, NOW)).rejects.toMatchObject({
+      status: 502,
+      message: expect.stringContaining("x-error-message: image input not supported") as string,
+    });
+    expect(calls).toBe(1);
+  });
+});
